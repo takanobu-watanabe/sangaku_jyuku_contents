@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ニキーチンの積み木 - 3Dキューブパズル</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    background: #e8f4f8; overflow: hidden; user-select: none;
+  }
+  #app { width: 100vw; height: 100vh; display: flex; }
+
+  /* 左パネル */
+  #left-panel {
+    width: 180px; min-width: 180px; background: #fff;
+    border-right: 2px solid #d0e0e8;
+    display: flex; flex-direction: column; z-index: 10;
+  }
+  #left-header {
+    padding: 12px; text-align: center;
+    background: linear-gradient(135deg, #4fc3f7, #29b6f6);
+    color: white; font-weight: bold; font-size: 0.95rem;
+  }
+  #piece-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .piece-card {
+    padding: 6px; margin-bottom: 6px; border-radius: 14px;
+    background: #f5f9fc; cursor: pointer; transition: all 0.2s;
+    border: 3px solid transparent; text-align: center;
+  }
+  .piece-card:hover { background: #e3f2fd; }
+  .piece-card.selected { border-color: #2196f3; background: #e3f2fd; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
+  .piece-card.placed { opacity: 0.3; }
+  .piece-card canvas { width: 100%; height: 70px; border-radius: 8px; }
+  .piece-card .name { font-size: 0.8rem; margin-top: 2px; color: #555; font-weight: bold; }
+  .piece-card .badge {
+    display: inline-block; padding: 1px 8px; border-radius: 8px;
+    font-size: 0.65rem; color: white; margin-top: 2px;
+  }
+  .piece-card .shortcut {
+    display: inline-block; padding: 0 5px; border-radius: 4px;
+    font-size: 0.6rem; color: #999; background: #eee; margin-left: 4px;
+  }
+
+  /* 中央 */
+  #center { flex: 1; position: relative; overflow: hidden; }
+  #center canvas { display: block; }
+
+  /* 右パネル */
+  #right-panel {
+    width: 300px; min-width: 300px; background: #fff;
+    border-left: 2px solid #d0e0e8;
+    display: flex; flex-direction: column; z-index: 10;
+    overflow-y: auto;
+  }
+
+  /* 進捗 */
+  #progress-section { padding: 12px; text-align: center; border-bottom: 2px solid #e8f0f4; }
+  #progress-bar-outer {
+    width: 100%; height: 24px; background: #e0e8ec; border-radius: 12px;
+    overflow: hidden; margin-top: 4px; position: relative;
+  }
+  #progress-bar-inner {
+    height: 100%; background: linear-gradient(90deg, #66bb6a, #43a047);
+    border-radius: 12px; transition: width 0.4s ease; width: 0%;
+  }
+  #progress-text {
+    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: bold; color: #333;
+  }
+
+  /* 操作ボタン */
+  #controls-section { padding: 8px; display: flex; flex-direction: column; gap: 5px; }
+  .section-title { font-size: 0.85rem; font-weight: bold; color: #555; text-align: center; margin-bottom: 2px; }
+  .btn-row { display: flex; gap: 5px; justify-content: center; }
+  .big-btn {
+    padding: 8px 0; border: none; border-radius: 12px;
+    font-size: 0.9rem; cursor: pointer; font-weight: bold;
+    transition: all 0.15s; flex: 1;
+    display: flex; align-items: center; justify-content: center; gap: 4px;
+  }
+  .big-btn:hover { transform: scale(1.04); }
+  .big-btn:active { transform: scale(0.97); }
+  .btn-rotate { background: #e3f2fd; color: #1976d2; border: 2px solid #bbdefb; }
+  .btn-rotate:hover { background: #bbdefb; }
+  .btn-undo { background: #fff3e0; color: #e65100; border: 2px solid #ffe0b2; }
+  .btn-undo:hover { background: #ffe0b2; }
+  .btn-reset { background: #fce4ec; color: #c62828; border: 2px solid #f8bbd0; }
+  .btn-reset:hover { background: #f8bbd0; }
+  .btn-answer { background: #ede7f6; color: #6a1b9a; border: 2px solid #d1c4e9; }
+  .btn-answer:hover { background: #d1c4e9; }
+  .key-hint { font-size: 0.65rem; color: #999; background: #eee; padding: 1px 5px; border-radius: 4px; margin-left: 2px; }
+
+  /* 問題えらび */
+  #puzzle-section { padding: 12px; border-top: 2px solid #e8f0f4; }
+  #puzzle-selector {
+    width: 100%; padding: 10px; border-radius: 12px;
+    background: #f5f9fc; border: 2px solid #d0e0e8;
+    font-size: 0.95rem; font-weight: bold; color: #333; cursor: pointer;
+  }
+
+  /* キーボードヘルプ */
+  #keyboard-help {
+    padding: 10px 12px; border-top: 2px solid #e8f0f4;
+    font-size: 0.7rem; color: #888; line-height: 1.6;
+  }
+  #keyboard-help b { color: #555; }
+  .key { display: inline-block; padding: 1px 6px; border-radius: 4px; background: #e8eef2; color: #333; font-weight: bold; font-family: monospace; font-size: 0.75rem; border: 1px solid #ccd; }
+
+  #msg-bar { display: none; }
+
+  /* フィードバック */
+  #feedback {
+    position: absolute; top: 45%; left: 50%; transform: translate(-50%,-50%);
+    font-size: 3rem; font-weight: bold; z-index: 30; pointer-events: none; opacity: 0;
+    text-shadow: 0 3px 12px rgba(0,0,0,0.2);
+  }
+  @keyframes pop {
+    0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+    40% { transform: translate(-50%,-50%) scale(1.2); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+  }
+  #feedback.show { animation: pop 1.2s ease forwards; }
+
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left-panel">
+    <div id="left-header">🧩 ピース</div>
+    <div id="piece-list"></div>
+  </div>
+  <div id="center">
+    <div id="msg-bar">
+      <div id="msg-text">ピースをえらんで、はこの中に おいてみよう！</div>
+      <div id="msg-sub">クリック: おく / 右クリック: はずす / ドラッグ: 回す</div>
+    </div>
+    <div id="feedback"></div>
+  </div>
+  <div id="right-panel">
+    <div id="progress-section">
+      <div class="section-title">📊 しんちょく</div>
+      <div id="progress-bar-outer">
+        <div id="progress-bar-inner"></div>
+        <div id="progress-text">0 / 7 ピース</div>
+      </div>
+    </div>
+    <div id="controls-section">
+      <div class="section-title">🔄 ピースを回す</div>
+      <div class="btn-row">
+        <button class="big-btn btn-rotate" onclick="rotatePiece('x')">⬆ たて <span class="key-hint">Q</span></button>
+        <button class="big-btn btn-rotate" onclick="rotatePiece('y')">➡ よこ <span class="key-hint">W</span></button>
+        <button class="big-btn btn-rotate" onclick="rotatePiece('z')">↩ ころ <span class="key-hint">E</span></button>
+      </div>
+      <div class="section-title" style="margin-top:6px">🛠 そうさ</div>
+      <button class="big-btn btn-undo" onclick="removePlacedPiece()">↩ このピースをはずす <span class="key-hint">R</span></button>
+      <button class="big-btn btn-reset" onclick="resetAll()">🔄 ぜんぶやりなおす</button>
+      <button class="big-btn btn-answer" onclick="openAnswer()">👁 こたえを見る <span class="key-hint">H</span></button>
+    </div>
+    <div id="answer-section" style="display:none; padding:10px; text-align:center; border-bottom:2px solid #e8f0f4;">
+      <div class="section-title">🎯 こたえ</div>
+      <canvas id="answer-canvas" width="280" height="180" style="width:100%; border-radius:8px; border:2px solid #bbdefb; background:#f0f5fa;"></canvas>
+      <div id="answer-legend" style="display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-top:6px;"></div>
+    </div>
+    <div id="puzzle-section">
+      <div class="section-title">📝 もんだいをえらぶ</div>
+      <select id="puzzle-selector" onchange="loadPuzzle(this.value)"></select>
+    </div>
+  </div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ==========================================
+// ピース・パズル定義
+// ==========================================
+const SOMA_PIECES = [
+  { name: "V", color: "#e53935", blocks: [[0,0,0],[1,0,0],[0,1,0]] },
+  { name: "L", color: "#1e88e5", blocks: [[0,0,0],[1,0,0],[0,1,0],[0,2,0]] },
+  { name: "T", color: "#43a047", blocks: [[0,0,0],[1,0,0],[2,0,0],[1,1,0]] },
+  { name: "Z", color: "#fdd835", blocks: [[0,0,0],[1,0,0],[1,1,0],[2,1,0]] },
+  { name: "A", color: "#8e24aa", blocks: [[0,0,0],[1,0,0],[0,1,0],[0,0,1]] },
+  { name: "B", color: "#fb8c00", blocks: [[0,0,0],[1,0,0],[1,1,0],[1,0,1]] },
+  { name: "P", color: "#00897b", blocks: [[0,0,0],[1,0,0],[0,1,0],[1,0,1]] },
+];
+
+// 全パズル候補（起動時にソルバーで検証し、解けるものだけ表示）
+// 共通4ピース: V(3) + T(4) + Z(4) + L(4) = 15ブロック
+const FOUR_PIECES = [
+  { name: "V", color: "#e53935", blocks: [[0,0,0],[1,0,0],[0,1,0]] },
+  { name: "T", color: "#43a047", blocks: [[0,0,0],[1,0,0],[2,0,0],[1,1,0]] },
+  { name: "Z", color: "#fdd835", blocks: [[0,0,0],[1,0,0],[1,1,0],[2,1,0]] },
+  { name: "L", color: "#1e88e5", blocks: [[0,0,0],[1,0,0],[0,1,0],[0,2,0]] },
+];
+
+const P4 = () => JSON.parse(JSON.stringify(FOUR_PIECES));
+
+// 15セルの形状を生成するヘルパー
+function rect(w,h){ const s=[]; for(let x=0;x<w;x++)for(let y=0;y<h;y++)s.push([x,y,0]); return s; }
+
+const ALL_PUZZLES = [
+  // --- 平面 (5問) ---
+  { id:1, title:"よこなが", gridSize:[5,3,1], pieces:P4(), targetShape:rect(5,3) },
+  { id:2, title:"L字", gridSize:[5,4,1], pieces:P4(),
+    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],
+      [0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0],
+      [0,2,0],[1,2,0],[2,2,0],[0,3,0],[1,3,0]] },
+  { id:3, title:"コの字", gridSize:[4,4,1], pieces:P4(),
+    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],
+      [0,1,0],[3,1,0],[0,2,0],[3,2,0],
+      [0,3,0],[1,3,0],[2,3,0],[3,3,0],
+      [1,1,0],[2,1,0],[1,2,0]] },
+  { id:4, title:"かいだん", gridSize:[5,5,1], pieces:P4(),
+    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],
+      [0,1,0],[1,1,0],[2,1,0],[3,1,0],
+      [0,2,0],[1,2,0],[2,2,0],
+      [0,3,0],[1,3,0],[0,4,0]] },
+  { id:5, title:"やじるし", gridSize:[5,5,1], pieces:P4(),
+    targetShape:[[2,0,0],
+      [1,1,0],[2,1,0],[3,1,0],
+      [0,2,0],[1,2,0],[2,2,0],[3,2,0],[4,2,0],
+      [2,3,0],[2,4,0],
+      [1,3,0],[3,3,0],[1,4,0],[3,4,0]] },
+
+  // --- 立体 (5問) ---
+  { id:6, title:"だんさ", gridSize:[3,2,3], pieces:P4(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);
+      for(let x=0;x<3;x++)for(let z=0;z<2;z++)s.push([x,1,z]);
+      return s;})() },
+  { id:7, title:"ゆか", gridSize:[5,1,3], pieces:P4(),
+    targetShape:(()=>{const s=[];for(let x=0;x<5;x++)for(let z=0;z<3;z++)s.push([x,0,z]);return s;})() },
+  { id:8, title:"立体L", gridSize:[3,3,2], pieces:P4(),
+    targetShape:(()=>{const s=[];
+      // 底面 y=0: 3×2 = 6
+      for(let x=0;x<3;x++)for(let z=0;z<2;z++)s.push([x,0,z]);
+      // 中段 y=1: 3×2 = 6
+      for(let x=0;x<3;x++)for(let z=0;z<2;z++)s.push([x,1,z]);
+      // 上段 y=2: L字の角 = 3
+      s.push([0,2,0],[0,2,1],[1,2,0]);
+      return s;})() },
+  { id:9, title:"おうち", gridSize:[3,2,3], pieces:P4(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);
+      for(let x=0;x<3;x++)s.push([x,1,0]);
+      s.push([0,1,2],[1,1,2],[2,1,2]);
+      return s;})() },
+  { id:10, title:"たかいかべ", gridSize:[3,5,1], pieces:P4(),
+    targetShape:(()=>{const s=[];for(let x=0;x<3;x++)for(let y=0;y<5;y++)s.push([x,y,0]);return s;})() },
+];
+
+// ==========================================
+// 状態
+// ==========================================
+let currentPuzzle = null, pieces = [], selectedPieceIdx = -1;
+let grid = null, placedPieces = new Map();
+let currentSolution = null; // ソルバーの解を保持
+
+// ==========================================
+// メイン3D
+// ==========================================
+const centerEl = document.getElementById('center');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xe8f4f8);
+const camera = new THREE.PerspectiveCamera(40,1,0.1,100);
+camera.position.set(6,5,6);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+centerEl.insertBefore(renderer.domElement, centerEl.firstChild);
+
+function resizeRenderer() {
+  const w = centerEl.clientWidth, h = centerEl.clientHeight;
+  camera.aspect = w/h; camera.updateProjectionMatrix();
+  renderer.setSize(w,h);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+}
+resizeRenderer();
+window.addEventListener('resize', resizeRenderer);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.08;
+controls.minDistance = 4; controls.maxDistance = 18;
+controls.maxPolarAngle = Math.PI;
+controls.target.set(1,1,1);
+
+scene.add(new THREE.AmbientLight(0xffffff,0.55));
+const dirLight = new THREE.DirectionalLight(0xffffff,0.85);
+dirLight.position.set(6,10,6); dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024,1024); scene.add(dirLight);
+scene.add(new THREE.HemisphereLight(0x87ceeb,0xcde8f0,0.35));
+
+const gridGroup = new THREE.Group(); scene.add(gridGroup);
+const blockGroup = new THREE.Group(); scene.add(blockGroup);
+const previewGroup = new THREE.Group(); scene.add(previewGroup);
+
+// ==========================================
+// ソルバー（修正版）
+// ==========================================
+
+// 3D回転行列（90°単位、24通り）を全て列挙
+function apply3DRot(rot, [x, y, z]) {
+  return [
+    rot[0][0]*x + rot[0][1]*y + rot[0][2]*z,
+    rot[1][0]*x + rot[1][1]*y + rot[1][2]*z,
+    rot[2][0]*x + rot[2][1]*y + rot[2][2]*z,
+  ];
+}
+
+// 24回転行列を事前生成
+const ALL_ROTATIONS = (() => {
+  // 基本回転行列
+  const I  = [[1,0,0],[0,1,0],[0,0,1]];
+  const Rx = [[1,0,0],[0,0,-1],[0,1,0]];
+  const Ry = [[0,0,1],[0,1,0],[-1,0,0]];
+  const Rz = [[0,-1,0],[1,0,0],[0,0,1]];
+
+  function matMul(a, b) {
+    const r = [[0,0,0],[0,0,0],[0,0,0]];
+    for (let i=0;i<3;i++) for (let j=0;j<3;j++)
+      for (let k=0;k<3;k++) r[i][j] += a[i][k]*b[k][j];
+    return r;
+  }
+  function matKey(m) { return m.flat().join(','); }
+
+  // 全組み合わせで24回転を生成
+  const seen = new Set();
+  const rots = [];
+  const bases = [I, Rx, Ry, Rz];
+  // Rx^a * Ry^b * Rz^c for a,b,c in 0..3
+  let rxp = I;
+  for (let a=0;a<4;a++) {
+    let ryp = I;
+    for (let b=0;b<4;b++) {
+      let rzp = I;
+      for (let c=0;c<4;c++) {
+        const m = matMul(matMul(rxp, ryp), rzp);
+        const k = matKey(m);
+        if (!seen.has(k)) { seen.add(k); rots.push(m); }
+        rzp = matMul(rzp, Rz);
+      }
+      ryp = matMul(ryp, Ry);
+    }
+    rxp = matMul(rxp, Rx);
+  }
+  return rots; // exactly 24
+})();
+
+function normalizeBlocks(blocks) {
+  const mx=Math.min(...blocks.map(b=>b[0]));
+  const my=Math.min(...blocks.map(b=>b[1]));
+  const mz=Math.min(...blocks.map(b=>b[2]));
+  return blocks.map(([x,y,z])=>[x-mx,y-my,z-mz]);
+}
+
+// ピースの全回転（重複除去、正規化済み）
+function allOrientations(blocks) {
+  const seen = new Set();
+  const results = [];
+  for (const rot of ALL_ROTATIONS) {
+    const rotated = blocks.map(b => apply3DRot(rot, b).map(Math.round));
+    const norm = normalizeBlocks(rotated);
+    const key = norm.map(b=>b.join(',')).sort().join('|');
+    if (!seen.has(key)) {
+      seen.add(key);
+      results.push(norm);
+    }
+  }
+  return results;
+}
+
+function solvePuzzle(puzzle) {
+  const [sx,sy,sz] = puzzle.gridSize;
+
+  // ターゲットセルの集合
+  const targetSet = new Set();
+  if (puzzle.targetShape) {
+    puzzle.targetShape.forEach(([x,y,z]) => targetSet.add(`${x},${y},${z}`));
+  } else {
+    for(let x=0;x<sx;x++) for(let y=0;y<sy;y++) for(let z=0;z<sz;z++)
+      targetSet.add(`${x},${y},${z}`);
+  }
+  const targetList = [...targetSet].map(s => s.split(',').map(Number));
+  const totalCells = targetList.length;
+
+  // ピースの合計ブロック数チェック
+  const totalBlocks = puzzle.pieces.reduce((s,p) => s + p.blocks.length, 0);
+  if (totalBlocks !== totalCells) return null; // セル数不一致は解なし
+
+  // グリッド (-1 = 空)
+  const g = Array.from({length:sx}, () =>
+    Array.from({length:sy}, () => Array(sz).fill(-1)));
+
+  // 各ピースの全配置候補を事前計算（重複排除）
+  const piecePlacements = puzzle.pieces.map(p => {
+    const orientations = allOrientations(p.blocks);
+    const seen = new Set();
+    const placements = [];
+    for (const ori of orientations) {
+      // oriの各ブロックをアンカーとして全オフセットを試す
+      for (const [tx,ty,tz] of targetList) {
+        for (const anchor of ori) {
+          const ox = tx - anchor[0], oy = ty - anchor[1], oz = tz - anchor[2];
+          const placed = ori.map(([x,y,z]) => [x+ox, y+oy, z+oz]);
+          // 全ブロックがターゲット内か
+          if (!placed.every(([x,y,z]) => targetSet.has(`${x},${y},${z}`))) continue;
+          // 重複排除
+          const key = placed.map(b=>b.join(',')).sort().join('|');
+          if (seen.has(key)) continue;
+          seen.add(key);
+          placements.push(placed);
+        }
+      }
+    }
+    return placements;
+  });
+
+  // バックトラッキング（最初の空セルを見つけて埋める戦略）
+  let found = false;
+
+  function findFirstEmpty() {
+    for (const [x,y,z] of targetList) {
+      if (g[x][y][z] === -1) return `${x},${y},${z}`;
+    }
+    return null;
+  }
+
+  function solve(pi) {
+    if (found) return;
+    if (pi >= puzzle.pieces.length) {
+      // 全ピース配置済み → 全セル埋まっていれば成功
+      if (!findFirstEmpty()) found = true;
+      return;
+    }
+    for (const pl of piecePlacements[pi]) {
+      if (pl.every(([x,y,z]) => g[x][y][z] === -1)) {
+        pl.forEach(([x,y,z]) => { g[x][y][z] = pi; });
+        solve(pi + 1);
+        if (found) return;
+        pl.forEach(([x,y,z]) => { g[x][y][z] = -1; });
+      }
+    }
+  }
+
+  solve(0);
+  return found ? g.map(p => p.map(r => [...r])) : null;
+}
+
+// 起動時に全パズルを解いて、解けるものだけ採用
+const PUZZLES = [];
+for (const p of ALL_PUZZLES) {
+  p._solution = solvePuzzle(p);
+  if (p._solution) PUZZLES.push(p);
+}
+
+// ==========================================
+// 右パネル内に正解を表示
+// ==========================================
+let answerScene, answerCamera, answerRenderer, answerGroup, answerControls, answerActive=false;
+
+function initAnswerView() {
+  const canvas = document.getElementById('answer-canvas');
+  answerScene = new THREE.Scene();
+  answerScene.background = new THREE.Color(0xf0f5fa);
+  answerCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 50);
+  answerRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  answerRenderer.setSize(280, 180);
+  answerRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  answerScene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const dl = new THREE.DirectionalLight(0xffffff, 0.85);
+  dl.position.set(5, 8, 5); answerScene.add(dl);
+  answerGroup = new THREE.Group();
+  answerScene.add(answerGroup);
+  // マウスで回転操作
+  answerControls = new OrbitControls(answerCamera, canvas);
+  answerControls.enableDamping = true;
+  answerControls.dampingFactor = 0.08;
+  answerControls.minDistance = 2;
+  answerControls.maxDistance = 15;
+}
+initAnswerView();
+
+function buildAnswerShape(puzzle, sol) {
+  while (answerGroup.children.length) {
+    const c = answerGroup.children[0];
+    c.geometry?.dispose(); c.material?.dispose();
+    answerGroup.remove(c);
+  }
+  const [sx,sy,sz] = puzzle.gridSize;
+  let cells = puzzle.targetShape ? [...puzzle.targetShape] : [];
+  if (!cells.length) for(let x=0;x<sx;x++)for(let y=0;y<sy;y++)for(let z=0;z<sz;z++)cells.push([x,y,z]);
+  let cx=0,cy=0,cz=0;
+  cells.forEach(([x,y,z])=>{cx+=x;cy+=y;cz+=z;});
+  cx/=cells.length;cy/=cells.length;cz/=cells.length;
+  const pColors = puzzle.pieces.map(p=>p.color);
+  const cellSet = new Set(cells.map(c=>c.join(',')));
+  cells.forEach(([x,y,z])=>{
+    const pi = sol[x][y][z];
+    const color = pi >= 0 ? pColors[pi] : '#90a4ae';
+    const geo = new THREE.BoxGeometry(0.98,0.98,0.98);
+    const mat = new THREE.MeshStandardMaterial({color:new THREE.Color(color),roughness:0.3,metalness:0.05});
+    const mesh = new THREE.Mesh(geo,mat);
+    mesh.position.set(x-cx,y-cy,z-cz);
+    answerGroup.add(mesh);
+    const dirs=[[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
+    dirs.forEach(([dx,dy,dz])=>{
+      const nx=x+dx,ny=y+dy,nz=z+dz;
+      const nPi=(cellSet.has(`${nx},${ny},${nz}`))?sol[nx]?.[ny]?.[nz]:-2;
+      if(nPi!==pi){
+        const hw=0.5;let corners;
+        if(dx!==0){const f=dx*hw;corners=[[f,-hw,-hw],[f,hw,-hw],[f,hw,hw],[f,-hw,hw]];}
+        else if(dy!==0){const f=dy*hw;corners=[[-hw,f,-hw],[hw,f,-hw],[hw,f,hw],[-hw,f,hw]];}
+        else{const f=dz*hw;corners=[[-hw,-hw,f],[hw,-hw,f],[hw,hw,f],[-hw,hw,f]];}
+        const pts=[];
+        for(let i=0;i<corners.length;i++){
+          const a=corners[i],b=corners[(i+1)%corners.length];
+          pts.push(new THREE.Vector3(a[0],a[1],a[2]),new THREE.Vector3(b[0],b[1],b[2]));
+        }
+        const lg=new THREE.BufferGeometry().setFromPoints(pts);
+        const lm=new THREE.LineSegments(lg,new THREE.LineBasicMaterial({color:0x222222,linewidth:2}));
+        lm.position.set(x-cx,y-cy,z-cz);answerGroup.add(lm);
+      }
+    });
+  });
+  const maxDim = Math.max(sx,sy,sz);
+  const d = maxDim * 1.6;
+  answerCamera.position.set(d*0.7,d*0.55,d*0.7);
+  answerCamera.lookAt(0,0,0);
+  answerControls.target.set(0,0,0);
+  answerControls.update();
+
+  // 凡例
+  const legend = document.getElementById('answer-legend');
+  legend.innerHTML = '';
+  puzzle.pieces.forEach(p => {
+    const item = document.createElement('span');
+    item.style.cssText = 'display:inline-flex;align-items:center;gap:3px;font-size:0.8rem;font-weight:bold;color:#333;';
+    const dot = document.createElement('span');
+    dot.style.cssText = `width:14px;height:14px;border-radius:4px;background:${p.color};border:1px solid rgba(0,0,0,0.15);display:inline-block;`;
+    item.appendChild(dot);
+    item.appendChild(document.createTextNode(p.name));
+    legend.appendChild(item);
+  });
+}
+
+window.openAnswer = function() {
+  if (!currentSolution) return;
+  const section = document.getElementById('answer-section');
+  if (section.style.display === 'none') {
+    section.style.display = 'block';
+    buildAnswerShape(currentPuzzle, currentSolution);
+    answerActive = true;
+  } else {
+    section.style.display = 'none';
+    answerActive = false;
+  }
+};
+
+// ソルバー実行
+
+// ==========================================
+// グリッド描画
+// ==========================================
+function drawGrid(sx,sy,sz) {
+  while(gridGroup.children.length){
+    const c=gridGroup.children[0];c.geometry?.dispose();c.material?.dispose();gridGroup.remove(c);
+  }
+  const boxGeo=new THREE.BoxGeometry(sx,sy,sz);
+  const wireframe=new THREE.LineSegments(new THREE.EdgesGeometry(boxGeo),
+    new THREE.LineBasicMaterial({color:0x90a4ae,linewidth:2}));
+  wireframe.position.set((sx-1)/2,(sy-1)/2,(sz-1)/2);gridGroup.add(wireframe);
+  const lineMat=new THREE.LineBasicMaterial({color:0xb0bec5,transparent:true,opacity:0.5});
+  for(let x=0;x<=sx;x++){
+    const g=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(x-0.5,-0.5,-0.5),new THREE.Vector3(x-0.5,-0.5,sz-0.5)]);
+    gridGroup.add(new THREE.Line(g,lineMat));
+  }
+  for(let z=0;z<=sz;z++){
+    const g=new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-0.5,-0.5,z-0.5),new THREE.Vector3(sx-0.5,-0.5,z-0.5)]);
+    gridGroup.add(new THREE.Line(g,lineMat));
+  }
+  const tc=currentPuzzle.targetShape?new Set(currentPuzzle.targetShape.map(p=>p.join(','))):null;
+  for(let x=0;x<sx;x++)for(let y=0;y<sy;y++)for(let z=0;z<sz;z++){
+    if(tc&&!tc.has(`${x},${y},${z}`))continue;
+    const geo=new THREE.BoxGeometry(0.97,0.97,0.97);
+    const mat=new THREE.MeshStandardMaterial({
+      color:0x90caf9,transparent:true,opacity:0.08,roughness:0.8,depthWrite:false});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(x,y,z);mesh.userData={gx:x,gy:y,gz:z};gridGroup.add(mesh);
+  }
+}
+
+// ==========================================
+// ピース操作（ユーザー用の軸回転）
+// ==========================================
+function rotateBlocksAxis(blocks, axis) {
+  return blocks.map(([x,y,z]) => {
+    if (axis==='x') return [x,-z,y];
+    if (axis==='y') return [z,y,-x];
+    if (axis==='z') return [-y,x,z];
+    return [x,y,z];
+  });
+}
+window.rotatePiece = function(axis) {
+  if (selectedPieceIdx<0||placedPieces.has(selectedPieceIdx)) return;
+  pieces[selectedPieceIdx].blocks = normalizeBlocks(
+    rotateBlocksAxis(pieces[selectedPieceIdx].blocks, axis));
+  updatePieceCards(); updatePreview();
+};
+
+// ==========================================
+// ピースカード
+// ==========================================
+const miniScenes=[],miniCams=[],miniRenderers=[];
+function createPieceCards(){
+  const list=document.getElementById('piece-list');
+  list.innerHTML='';
+  miniScenes.length=0;miniCams.length=0;miniRenderers.length=0;
+  pieces.forEach((p,i)=>{
+    const card=document.createElement('div');
+    card.className='piece-card'+(i===selectedPieceIdx?' selected':'');
+    if(placedPieces.has(i))card.classList.add('placed');
+    card.onclick=()=>selectPiece(i);
+    const canvas=document.createElement('canvas');
+    canvas.width=200;canvas.height=100;card.appendChild(canvas);
+    const nameEl=document.createElement('div');
+    nameEl.className='name';
+    nameEl.innerHTML=`${p.name} <span class="shortcut">${i+1}</span>`;
+    card.appendChild(nameEl);
+    const badge=document.createElement('span');
+    badge.className='badge';badge.style.background=p.color;
+    badge.textContent=placedPieces.has(i)?'✓ おいた':`${p.blocks.length}コ`;
+    card.appendChild(badge);
+    list.appendChild(card);
+    const s=new THREE.Scene();s.background=new THREE.Color(0xf5f9fc);
+    s.add(new THREE.AmbientLight(0xffffff,0.6));
+    const dl=new THREE.DirectionalLight(0xffffff,0.8);dl.position.set(3,5,3);s.add(dl);
+    const c=new THREE.PerspectiveCamera(35,2,0.1,50);
+    const r=new THREE.WebGLRenderer({canvas,antialias:true});r.setSize(200,100);
+    miniScenes.push(s);miniCams.push(c);miniRenderers.push(r);
+    renderMiniPiece(i);
+  });
+}
+function renderMiniPiece(i){
+  const s=miniScenes[i],c=miniCams[i],r=miniRenderers[i],p=pieces[i];
+  while(s.children.length>2)s.remove(s.children[s.children.length-1]);
+  const group=new THREE.Group();const nb=normalizeBlocks(p.blocks);
+  const center=new THREE.Vector3();
+  nb.forEach(([x,y,z])=>center.add(new THREE.Vector3(x,y,z)));
+  center.divideScalar(nb.length);
+  nb.forEach(([x,y,z])=>{
+    const geo=new THREE.BoxGeometry(0.85,0.85,0.85);
+    const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(p.color),roughness:0.3});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(x-center.x,y-center.y,z-center.z);group.add(mesh);
+    const edges=new THREE.EdgesGeometry(geo);
+    const line=new THREE.LineSegments(edges,
+      new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.15}));
+    line.position.copy(mesh.position);group.add(line);
+  });
+  s.add(group);
+  const md=Math.max(...nb.map(([x,y,z])=>Math.max(
+    Math.abs(x-center.x),Math.abs(y-center.y),Math.abs(z-center.z))))+1;
+  c.position.set(md*1.8,md*1.2,md*1.8);c.lookAt(0,0,0);r.render(s,c);
+}
+function updatePieceCards(){
+  const cards=document.querySelectorAll('.piece-card');
+  cards.forEach((card,i)=>{
+    card.className='piece-card'+(i===selectedPieceIdx?' selected':'')+(placedPieces.has(i)?' placed':'');
+    const badge=card.querySelector('.badge');
+    if(badge)badge.textContent=placedPieces.has(i)?'✓ おいた':`${pieces[i].blocks.length}コ`;
+    renderMiniPiece(i);
+  });
+  updateProgress();
+}
+function selectPiece(i){
+  selectedPieceIdx=i;updatePieceCards();updatePreview();
+  const p=pieces[i];
+  document.getElementById('msg-text').textContent=placedPieces.has(i)
+    ?`「${p.name}」はおいてあるよ。Rキーではずせるよ`
+    :`「${p.name}」をえらんだよ。クリックしておこう！`;
+}
+function autoSelectNext(){
+  for(let i=0;i<pieces.length;i++){if(!placedPieces.has(i)){selectPiece(i);return;}}
+  selectedPieceIdx=-1;
+}
+
+// ==========================================
+// 進捗
+// ==========================================
+function updateProgress(){
+  const total=pieces.length,placed=placedPieces.size;
+  document.getElementById('progress-bar-inner').style.width=Math.round(placed/total*100)+'%';
+  document.getElementById('progress-text').textContent=`${placed} / ${total} ピース`;
+}
+
+// ==========================================
+// プレビュー
+// ==========================================
+let previewPos=null;
+function clearPreview(){
+  while(previewGroup.children.length){
+    const c=previewGroup.children[0];c.geometry?.dispose();c.material?.dispose();previewGroup.remove(c);
+  }
+}
+function updatePreview(){
+  clearPreview();
+  if(selectedPieceIdx<0||!previewPos||placedPieces.has(selectedPieceIdx))return;
+  const p=pieces[selectedPieceIdx];const [sx,sy,sz]=currentPuzzle.gridSize;
+  const tc=currentPuzzle.targetShape?new Set(currentPuzzle.targetShape.map(c=>c.join(','))):null;
+  let allValid=true;
+  const positions=p.blocks.map(([bx,by,bz])=>{
+    const wx=previewPos.x+bx,wy=previewPos.y+by,wz=previewPos.z+bz;
+    let valid=wx>=0&&wx<sx&&wy>=0&&wy<sy&&wz>=0&&wz<sz&&grid[wx][wy][wz]===-1;
+    if(valid&&tc&&!tc.has(`${wx},${wy},${wz}`))valid=false;
+    if(!valid)allValid=false;
+    return{wx,wy,wz,valid};
+  });
+  const previewColor = allValid ? new THREE.Color(p.color) : new THREE.Color(0xff1744);
+  positions.forEach(({wx,wy,wz})=>{
+    const geo=new THREE.BoxGeometry(0.93,0.93,0.93);
+    const mat=new THREE.MeshStandardMaterial({color:previewColor,roughness:0.3});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(wx,wy,wz);previewGroup.add(mesh);
+  });
+}
+
+// ==========================================
+// 配置
+// ==========================================
+function placePiece(pieceIdx,pos){
+  const p=pieces[pieceIdx];const [sx,sy,sz]=currentPuzzle.gridSize;
+  const wb=p.blocks.map(([bx,by,bz])=>({x:pos.x+bx,y:pos.y+by,z:pos.z+bz}));
+  const tc=currentPuzzle.targetShape?new Set(currentPuzzle.targetShape.map(c=>c.join(','))):null;
+  for(const b of wb){
+    if(b.x<0||b.x>=sx||b.y<0||b.y>=sy||b.z<0||b.z>=sz)return false;
+    if(grid[b.x][b.y][b.z]!==-1)return false;
+    if(tc&&!tc.has(`${b.x},${b.y},${b.z}`))return false;
+  }
+  const meshes=[];
+  wb.forEach(b=>{
+    grid[b.x][b.y][b.z]=pieceIdx;
+    const geo=new THREE.BoxGeometry(0.92,0.92,0.92);
+    const mat=new THREE.MeshStandardMaterial({color:new THREE.Color(p.color),roughness:0.28,metalness:0.05});
+    const mesh=new THREE.Mesh(geo,mat);
+    mesh.position.set(b.x,b.y,b.z);mesh.castShadow=true;mesh.receiveShadow=true;
+    blockGroup.add(mesh);
+    const edges=new THREE.EdgesGeometry(geo);
+    const line=new THREE.LineSegments(edges,
+      new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.12}));
+    line.position.copy(mesh.position);blockGroup.add(line);
+    meshes.push(mesh,line);
+    mesh.scale.set(0,0,0);line.scale.set(0,0,0);
+    const start=Date.now();
+    (function anim(){
+      const t=Math.min((Date.now()-start)/180,1);
+      const s=t<0.5?2*t*t:-1+(4-2*t)*t;
+      mesh.scale.set(s,s,s);line.scale.set(s,s,s);
+      if(t<1)requestAnimationFrame(anim);
+      else{mesh.scale.set(1,1,1);line.scale.set(1,1,1);}
+    })();
+  });
+  placedPieces.set(pieceIdx,{blocks:wb,meshes});
+  clearPreview();autoSelectNext();checkComplete();
+  return true;
+}
+window.removePlacedPiece=function(){
+  if(selectedPieceIdx<0||!placedPieces.has(selectedPieceIdx))return;
+  const data=placedPieces.get(selectedPieceIdx);
+  data.blocks.forEach(b=>{grid[b.x][b.y][b.z]=-1;});
+  data.meshes.forEach(m=>{blockGroup.remove(m);m.geometry?.dispose();m.material?.dispose();});
+  placedPieces.delete(selectedPieceIdx);updatePieceCards();
+  document.getElementById('msg-text').textContent=`「${pieces[selectedPieceIdx].name}」をはずしたよ`;
+};
+window.resetAll=function(){
+  placedPieces.forEach(data=>{
+    data.blocks.forEach(b=>{grid[b.x][b.y][b.z]=-1;});
+    data.meshes.forEach(m=>{blockGroup.remove(m);m.geometry?.dispose();m.material?.dispose();});
+  });
+  placedPieces.clear();clearPreview();selectedPieceIdx=-1;autoSelectNext();
+  document.getElementById('msg-text').textContent='やりなおしたよ！ピースをえらんでおこう！';
+};
+
+// ==========================================
+// 完成チェック
+// ==========================================
+function checkComplete(){
+  const [sx,sy,sz]=currentPuzzle.gridSize;
+  if(currentPuzzle.targetShape){
+    for(const [x,y,z] of currentPuzzle.targetShape)if(grid[x][y][z]===-1)return;
+  }else{
+    for(let x=0;x<sx;x++)for(let y=0;y<sy;y++)for(let z=0;z<sz;z++)if(grid[x][y][z]===-1)return;
+  }
+  showFeedback('🎉 かんせい！すごい！');
+  document.getElementById('msg-text').textContent='やったね！パズルかんせい！';
+}
+function showFeedback(text){
+  const el=document.getElementById('feedback');
+  el.textContent=text;el.style.color='#2e7d32';
+  el.classList.remove('show');void el.offsetWidth;el.classList.add('show');
+}
+
+// ==========================================
+// レイキャスト
+// ==========================================
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+let mouseDownPos={x:0,y:0};
+function getGridCell(e){
+  const rect=renderer.domElement.getBoundingClientRect();
+  mouse.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse,camera);
+  const gm=gridGroup.children.filter(c=>c.isMesh&&c.userData.gx!==undefined);
+  const bm=blockGroup.children.filter(c=>c.isMesh);
+  const hits=raycaster.intersectObjects([...bm,...gm]);
+  if(hits.length>0){
+    const hit=hits[0];
+    if(bm.includes(hit.object)){
+      const pos=hit.object.position,normal=hit.face.normal.clone();
+      const adj=pos.clone().add(normal);
+      return{x:Math.round(adj.x),y:Math.round(adj.y),z:Math.round(adj.z),
+        hitBlock:true,blockPos:{x:Math.round(pos.x),y:Math.round(pos.y),z:Math.round(pos.z)}};
+    }
+    const ud=hit.object.userData;
+    return{x:ud.gx,y:ud.gy,z:ud.gz,hitBlock:false};
+  }
+  return null;
+}
+renderer.domElement.addEventListener('mousedown',e=>{mouseDownPos={x:e.clientX,y:e.clientY};});
+renderer.domElement.addEventListener('mousemove',e=>{
+  const cell=getGridCell(e);
+  if(cell&&selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
+    previewPos={x:cell.x,y:cell.y,z:cell.z};updatePreview();
+  }else{clearPreview();}
+});
+renderer.domElement.addEventListener('mouseup',e=>{
+  const dx=e.clientX-mouseDownPos.x,dy=e.clientY-mouseDownPos.y;
+  if(Math.sqrt(dx*dx+dy*dy)>5)return;
+  const cell=getGridCell(e);if(!cell)return;
+  if(e.button===2){
+    if(cell.hitBlock&&cell.blockPos){
+      const{x,y,z}=cell.blockPos;const pIdx=grid[x]?.[y]?.[z];
+      if(pIdx!==undefined&&pIdx!==-1){selectedPieceIdx=pIdx;window.removePlacedPiece();}
+    }
+    return;
+  }
+  if(selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
+    if(!placePiece(selectedPieceIdx,{x:cell.x,y:cell.y,z:cell.z})){
+      showFeedback('ここには おけないよ');
+      document.getElementById('feedback').style.color='#e53935';
+    }
+  }
+});
+renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
+// ==========================================
+// キーボード操作
+// ==========================================
+document.addEventListener('keydown', e => {
+  const key = e.key.toLowerCase();
+
+  // 1-7: ピース選択
+  if (key >= '1' && key <= '7') {
+    const idx = parseInt(key) - 1;
+    if (idx < pieces.length) selectPiece(idx);
+    e.preventDefault();
+    return;
+  }
+
+  switch (key) {
+    case 'q': window.rotatePiece('x'); e.preventDefault(); break;
+    case 'w': window.rotatePiece('y'); e.preventDefault(); break;
+    case 'e': window.rotatePiece('z'); e.preventDefault(); break;
+    case 'r': window.removePlacedPiece(); e.preventDefault(); break;
+    case 'h': window.openAnswer(); e.preventDefault(); break;
+    case 'tab':
+      e.preventDefault();
+      // 次の未配置ピースへ
+      if (pieces.length === 0) break;
+      let next = (selectedPieceIdx + 1) % pieces.length;
+      for (let i = 0; i < pieces.length; i++) {
+        if (!placedPieces.has(next)) { selectPiece(next); break; }
+        next = (next + 1) % pieces.length;
+      }
+      break;
+  }
+});
+
+// ==========================================
+// パズル読み込み
+// ==========================================
+window.loadPuzzle=function(idx){
+  idx=parseInt(idx);
+  currentPuzzle=PUZZLES[idx];
+  const [sx,sy,sz]=currentPuzzle.gridSize;
+  grid=Array.from({length:sx},()=>Array.from({length:sy},()=>Array(sz).fill(-1)));
+  while(blockGroup.children.length){
+    const c=blockGroup.children[0];c.geometry?.dispose();c.material?.dispose();blockGroup.remove(c);
+  }
+  placedPieces.clear();clearPreview();
+  pieces=currentPuzzle.pieces.map(p=>({...p,blocks:normalizeBlocks(p.blocks.map(b=>[...b]))}));
+  selectedPieceIdx=-1;
+  drawGrid(sx,sy,sz);
+  currentSolution = currentPuzzle._solution;
+  controls.target.set((sx-1)/2,(sy-1)/2,(sz-1)/2);
+  const dist=Math.max(sx,sy,sz)*2.5;
+  camera.position.set(dist,dist*0.7,dist);controls.update();
+  // 最初のピースを正解の位置に自動配置
+  if (currentSolution) {
+    const sol = currentSolution;
+    const blocks = [];
+    for(let x=0;x<sx;x++) for(let y=0;y<sy;y++) for(let z=0;z<sz;z++) {
+      if (sol[x][y][z] === 0) blocks.push({x,y,z});
+    }
+    if (blocks.length > 0) {
+      const p = pieces[0];
+      const meshes = [];
+      blocks.forEach(b => {
+        grid[b.x][b.y][b.z] = 0;
+        const geo = new THREE.BoxGeometry(0.92,0.92,0.92);
+        const mat = new THREE.MeshStandardMaterial({color:new THREE.Color(p.color),roughness:0.28,metalness:0.05});
+        const mesh = new THREE.Mesh(geo,mat);
+        mesh.position.set(b.x,b.y,b.z);mesh.castShadow=true;mesh.receiveShadow=true;
+        blockGroup.add(mesh);
+        const edges = new THREE.EdgesGeometry(geo);
+        const line = new THREE.LineSegments(edges,
+          new THREE.LineBasicMaterial({color:0x000000,transparent:true,opacity:0.12}));
+        line.position.copy(mesh.position);blockGroup.add(line);
+        meshes.push(mesh,line);
+      });
+      placedPieces.set(0, {blocks, meshes});
+    }
+  }
+  createPieceCards();autoSelectNext();
+  document.getElementById('msg-text').textContent=`「${currentPuzzle.title}」をつくろう！`;
+  // 答えが表示中なら新しい問題の答えに更新
+  if(answerActive && currentSolution){
+    buildAnswerShape(currentPuzzle, currentSolution);
+  }
+};
+
+const sel=document.getElementById('puzzle-selector');
+PUZZLES.forEach((p,i)=>{
+  const opt=document.createElement('option');
+  opt.value=i;opt.textContent=`もんだい${p.id}: ${p.title}`;sel.appendChild(opt);
+});
+
+// ==========================================
+// アニメーション
+// ==========================================
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();renderer.render(scene,camera);
+  if(answerActive){
+    answerControls.update();
+    answerRenderer.render(answerScene,answerCamera);
+  }
+}
+animate();
+loadPuzzle(0);
+</script>
+</body>
+</html>
