@@ -195,131 +195,107 @@ const FIVE_PIECES = [
 const P5 = () => JSON.parse(JSON.stringify(FIVE_PIECES));
 
 // 19セルの形状を生成するヘルパー
-function rect(w,h){ const s=[]; for(let x=0;x<w;x++)for(let y=0;y<h;y++)s.push([x,y,0]); return s; }
-// 長方形から指定セルを除去
-function rectMinus(w,h,remove){
+// ※ ピースAは3D角型のため、全パズルは3D（全次元≥2）が必須
+function box(sx,sy,sz){
+  const s=[];for(let x=0;x<sx;x++)for(let y=0;y<sy;y++)for(let z=0;z<sz;z++)s.push([x,y,z]);return s;
+}
+function boxMinus(sx,sy,sz,remove){
   const rm=new Set(remove.map(r=>r.join(',')));
-  const s=[];
-  for(let x=0;x<w;x++)for(let y=0;y<h;y++)if(!rm.has(`${x},${y},0`))s.push([x,y,0]);
-  return s;
+  return box(sx,sy,sz).filter(([x,y,z])=>!rm.has(`${x},${y},${z}`));
 }
 
 const ALL_PUZZLES = [
-  // --- 平面: 長方形-1 (5×4=20, 1セル除去=19) ---
-  { id:1, title:"かけた長方形", gridSize:[5,4,1], pieces:P5(),
-    targetShape:rectMinus(5,4,[[4,3]]) },
+  // --- 5×2×2=20 から1セル除去=19 (簡単系) ---
+  { id:1, title:"角おちはこ", gridSize:[5,2,2], pieces:P5(),
+    targetShape:boxMinus(5,2,2,[[4,1,1]]) },                         // 19セル
+  { id:2, title:"まんなか穴", gridSize:[5,2,2], pieces:P5(),
+    targetShape:boxMinus(5,2,2,[[2,0,1]]) },                         // 19セル
+  { id:3, title:"はしっこ穴", gridSize:[5,2,2], pieces:P5(),
+    targetShape:boxMinus(5,2,2,[[0,0,0]]) },                         // 19セル
 
-  { id:2, title:"角おち", gridSize:[5,4,1], pieces:P5(),
-    targetShape:rectMinus(5,4,[[0,0]]) },
-
-  // --- 平面: L字系 ---
-  { id:3, title:"大きなL字", gridSize:[5,5,1], pieces:P5(),
-    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],
-      [0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0],
-      [0,2,0],[1,2,0],[2,2,0],
-      [0,3,0],[1,3,0],[2,3,0],
-      [0,4,0],[1,4,0],[2,4,0]] },
-
-  // --- 平面: T字系 ---
-  { id:4, title:"太いT字", gridSize:[5,5,1], pieces:P5(),
-    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],
-      [0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0],
-      [1,2,0],[2,2,0],[3,2,0],
-      [1,3,0],[2,3,0],[3,3,0],
-      [1,4,0],[2,4,0],[3,4,0]] },
-
-  // --- 平面: 十字系 ---
-  { id:5, title:"大十字", gridSize:[5,5,1], pieces:P5(),
-    targetShape:[[1,0,0],[2,0,0],[3,0,0],
-      [1,1,0],[2,1,0],[3,1,0],
-      [0,2,0],[1,2,0],[2,2,0],[3,2,0],[4,2,0],
-      [1,3,0],[2,3,0],[3,3,0],
-      [1,4,0],[2,4,0],[3,4,0]] },
-
-  // --- 平面: かいだん ---
-  { id:6, title:"大かいだん", gridSize:[6,6,1], pieces:P5(),
-    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],[5,0,0],
-      [0,1,0],[1,1,0],[2,1,0],[3,1,0],[4,1,0],
-      [0,2,0],[1,2,0],[2,2,0],[3,2,0],
-      [0,3,0],[1,3,0],[2,3,0],
-      [0,4,0]] },
-
-  // --- 平面: コの字 ---
-  { id:7, title:"大コの字", gridSize:[5,5,1], pieces:P5(),
-    targetShape:[[0,0,0],[1,0,0],[2,0,0],[3,0,0],[4,0,0],
-      [0,1,0],[4,1,0],
-      [0,2,0],[4,2,0],
-      [0,3,0],[4,3,0],
-      [0,4,0],[1,4,0],[2,4,0],[3,4,0],[4,4,0],
-      [1,1,0],[1,2,0],[1,3,0]] },
-
-  // --- 立体: 段差 ---
-  { id:8, title:"3Dだんさ", gridSize:[4,2,3], pieces:P5(),
+  // --- 4×2×3=24 から5セル除去=19 (段差系) ---
+  { id:4, title:"だんさ", gridSize:[4,2,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<4;x++)for(let z=0;z<3;z++)s.push([x,0,z]);
-      for(let x=0;x<4;x++)s.push([x,1,0]);
-      s.push([0,1,1],[1,1,1],[2,1,1]);
-      return s;})() },
-
-  // --- 立体: L字立体 ---
-  { id:9, title:"3D L字", gridSize:[4,3,2], pieces:P5(),
+      for(let x=0;x<4;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 12
+      for(let x=0;x<4;x++)s.push([x,1,0]);                          // 4
+      s.push([0,1,1],[1,1,1],[2,1,1]);                               // 3
+      return s;})() },                                                // =19
+  { id:5, title:"2だんかべ", gridSize:[4,2,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<4;x++)for(let z=0;z<2;z++)s.push([x,0,z]);
-      for(let x=0;x<4;x++)s.push([x,1,0]);
-      s.push([0,1,1],[1,1,1],[0,2,0],[0,2,1]);
-      return s;})() },
+      for(let x=0;x<4;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 12
+      s.push([0,1,0],[1,1,0],[2,1,0],[3,1,0]);                       // 4
+      s.push([0,1,2],[1,1,2],[2,1,2]);                                // 3
+      return s;})() },                                                // =19
 
-  // --- 立体: タワー ---
-  { id:10, title:"3Dタワー", gridSize:[3,3,3], pieces:P5(),
+  // --- 5×2×2=20 ベースの変形 ---
+  { id:6, title:"L字はこ", gridSize:[5,3,2], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);
-      s.push([0,1,0],[2,1,0],[0,1,2],[2,1,2]);
-      s.push([1,1,1],[1,2,1]);
-      for(let x=0;x<3;x++)s.push([x,2,0]);
-      return s;})() },
-
-  // --- 追加候補（ソルバーが解なしならスキップ） ---
-  { id:11, title:"やじるし", gridSize:[5,6,1], pieces:P5(),
-    targetShape:[[2,0,0],
-      [1,1,0],[2,1,0],[3,1,0],
-      [0,2,0],[1,2,0],[2,2,0],[3,2,0],[4,2,0],
-      [1,3,0],[2,3,0],[3,3,0],
-      [1,4,0],[2,4,0],[3,4,0],
-      [1,5,0],[2,5,0],[3,5,0],[2,5,0]] },
-
-  { id:12, title:"ひろいゆか", gridSize:[4,1,5], pieces:P5(),
+      for(let x=0;x<5;x++)for(let z=0;z<2;z++)s.push([x,0,z]);      // 10
+      for(let x=0;x<5;x++)s.push([x,1,0]);                           // 5
+      s.push([0,1,1],[1,1,1],[0,2,0],[0,2,1]);                        // 4
+      return s;})() },                                                 // =19
+  { id:7, title:"T字はこ", gridSize:[5,2,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<4;x++)for(let z=0;z<5;z++)s.push([x,0,z]);
-      return s;})() },
+      for(let x=0;x<5;x++)for(let z=0;z<2;z++)s.push([x,0,z]);      // 10
+      for(let x=0;x<5;x++)s.push([x,1,0]);                           // 5
+      s.push([1,0,2],[2,0,2],[3,0,2],[2,1,1]);                        // 4
+      return s;})() },                                                 // =19
 
-  { id:13, title:"たかいかべ", gridSize:[1,5,4], pieces:P5(),
+  // --- 3×3×3=27 から8セル除去=19 (立体パズル) ---
+  { id:8, title:"2そうはこ", gridSize:[3,3,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let y=0;y<5;y++)for(let z=0;z<4;z++)s.push([0,y,z]);
-      return s;})() },
-
-  { id:14, title:"ながいはこ", gridSize:[19,1,1], pieces:P5(),
-    targetShape:(()=>{const s=[];for(let x=0;x<19;x++)s.push([x,0,0]);return s;})() },
-
-  { id:15, title:"Hの字", gridSize:[5,5,1], pieces:P5(),
-    targetShape:[[0,0,0],[0,1,0],[0,2,0],[0,3,0],[0,4,0],
-      [4,0,0],[4,1,0],[4,2,0],[4,3,0],[4,4,0],
-      [1,2,0],[2,2,0],[3,2,0],
-      [1,0,0],[1,4,0],[2,0,0],[2,4,0],[3,0,0],[3,4,0]] },
-
-  { id:16, title:"3Dおうち", gridSize:[3,3,3], pieces:P5(),
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 9
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,1,z]);      // 9
+      s.push([1,2,1]);                                                // 1
+      return s;})() },                                                // =19
+  { id:9, title:"かいだんタワー", gridSize:[3,3,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);
-      for(let x=0;x<3;x++)s.push([x,1,0]);
-      s.push([0,1,2],[1,1,2],[2,1,2]);
-      s.push([1,2,0],[1,2,2],[1,1,1]);
-      return s;})() },
-
-  { id:17, title:"3Dかいだん", gridSize:[5,3,2], pieces:P5(),
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 9
+      for(let x=0;x<3;x++)s.push([x,1,0],[x,1,1]);                   // 6
+      s.push([0,2,0],[1,2,0],[0,1,2],[1,1,2]);                        // 4
+      return s;})() },                                                 // =19
+  { id:10, title:"えんとつおうち", gridSize:[3,3,3], pieces:P5(),
     targetShape:(()=>{const s=[];
-      for(let x=0;x<5;x++)for(let z=0;z<2;z++)s.push([x,0,z]);
-      for(let x=0;x<4;x++)s.push([x,1,0]);
-      s.push([0,1,1],[1,1,1],[0,2,0],[0,2,1],[1,2,0]);
-      return s;})() },
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 9
+      for(let x=0;x<3;x++)s.push([x,1,0]);                           // 3
+      for(let x=0;x<3;x++)s.push([x,1,2]);                           // 3
+      s.push([0,1,1],[2,1,1]);                                        // 2
+      s.push([1,1,1],[1,2,1]);                                        // 2 (えんとつ)
+      return s;})() },                                                 // =19
+
+  // --- 追加候補 ---
+  { id:11, title:"かべとゆか", gridSize:[4,3,2], pieces:P5(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<4;x++)for(let z=0;z<2;z++)s.push([x,0,z]);      // 8
+      for(let x=0;x<4;x++)for(let z=0;z<2;z++)s.push([x,1,z]);      // 8
+      s.push([0,2,0],[1,2,0],[2,2,0]);                                // 3
+      return s;})() },                                                 // =19
+  { id:12, title:"ながいだんさ", gridSize:[5,2,2], pieces:P5(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<5;x++)for(let z=0;z<2;z++)s.push([x,0,z]);      // 10
+      for(let x=0;x<5;x++)s.push([x,1,0]);                           // 5
+      s.push([0,1,1],[1,1,1],[2,1,1],[3,1,1]);                        // 4
+      return s;})() },                                                 // =19
+  { id:13, title:"ひろいゆか", gridSize:[4,2,3], pieces:P5(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<4;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 12
+      for(let x=0;x<4;x++)s.push([x,1,0]);                           // 4
+      s.push([3,1,1],[3,1,2],[2,1,2]);                                 // 3
+      return s;})() },                                                 // =19
+  { id:14, title:"ななめだん", gridSize:[4,3,2], pieces:P5(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<4;x++)for(let z=0;z<2;z++)s.push([x,0,z]);      // 8
+      s.push([0,1,0],[1,1,0],[0,1,1],[1,1,1]);                        // 4
+      s.push([2,1,0],[3,1,0],[2,1,1]);                                 // 3
+      s.push([0,2,0],[0,2,1],[1,2,0],[1,2,1]);                         // 4
+      return s;})() },                                                  // =19
+  { id:15, title:"コの字はこ", gridSize:[3,3,3], pieces:P5(),
+    targetShape:(()=>{const s=[];
+      for(let x=0;x<3;x++)for(let z=0;z<3;z++)s.push([x,0,z]);      // 9
+      s.push([0,1,0],[2,1,0],[0,1,2],[2,1,2]);                        // 4
+      s.push([0,2,0],[1,2,0],[2,2,0]);                                 // 3
+      s.push([0,2,2],[1,2,2],[2,2,2]);                                 // 3
+      return s;})() },                                                  // =19
 ];
 
 // ==========================================
