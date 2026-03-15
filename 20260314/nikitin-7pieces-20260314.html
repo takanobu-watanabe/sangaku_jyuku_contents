@@ -49,7 +49,7 @@
 
   /* 右パネル */
   #right-panel {
-    width: 300px; min-width: 300px; background: #fff;
+    width: 360px; min-width: 360px; background: #fff;
     border-left: 2px solid #d0e0e8;
     display: flex; flex-direction: column; z-index: 10;
     overflow-y: auto;
@@ -497,7 +497,7 @@ function buildAnswerShape(puzzle, sol) {
     });
   });
   const maxDim = Math.max(sx,sy,sz);
-  const d = maxDim * 1.6;
+  const d = maxDim * 2.2;
   answerCamera.position.set(d*0.7,d*0.55,d*0.7);
   answerCamera.lookAt(0,0,0);
   answerControls.target.set(0,0,0);
