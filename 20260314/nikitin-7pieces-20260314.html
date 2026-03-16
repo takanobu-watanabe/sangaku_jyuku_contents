@@ -26,14 +26,18 @@
   #piece-list { flex: 1; overflow-y: auto; padding: 8px; }
   .piece-card {
     padding: 6px; margin-bottom: 6px; border-radius: 14px;
-    background: #f5f9fc; cursor: pointer; transition: all 0.2s;
-    border: 3px solid transparent; text-align: center;
+    background: #f5f9fc; cursor: pointer; transition: background 0.2s;
+    border: none !important; text-align: center;
+    -webkit-tap-highlight-color: transparent; outline: none !important;
+    -webkit-appearance: none; appearance: none; user-select: none; -webkit-user-select: none;
+  }
+  .piece-card, .piece-card *, .piece-card:focus, .piece-card:active,
+  .piece-card:focus-visible, .piece-card:target, .piece-card:focus-within {
+    outline: none !important; border: none !important;
+    -webkit-tap-highlight-color: transparent !important;
   }
   @media (hover: hover) { .piece-card:hover { background: #e3f2fd; } }
-  .piece-card.selected { border-color: #2196f3; background: #e3f2fd; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
-  .piece-card { -webkit-tap-highlight-color: transparent; outline: none; -webkit-appearance: none; appearance: none; }
-  .piece-card:focus, .piece-card:active, .piece-card:focus-visible { outline: none; border-color: transparent; box-shadow: none; }
-  .piece-card.selected:focus, .piece-card.selected:active { border-color: #2196f3; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
+  .piece-card.selected { background: #e3f2fd; }
   .piece-card.placed { opacity: 0.3; }
   .piece-card canvas { width: 100%; height: 70px; border-radius: 8px; }
   .piece-card .name { font-size: 0.8rem; margin-top: 2px; color: #555; font-weight: bold; }
@@ -586,15 +590,30 @@ window.rotatePiece = function(axis) {
 // ピースカード
 // ==========================================
 const miniScenes=[],miniCams=[],miniRenderers=[];
+let pieceListDelegated=false;
 function createPieceCards(){
   const list=document.getElementById('piece-list');
   list.innerHTML='';
   miniScenes.length=0;miniCams.length=0;miniRenderers.length=0;
+  if(!pieceListDelegated){
+    pieceListDelegated=true;
+    const handler=e=>{
+      const card=e.target.closest('.piece-card');
+      if(!card)return;
+      e.preventDefault();e.stopPropagation();
+      const idx=parseInt(card.dataset.idx);
+      if(!isNaN(idx)){selectPiece(idx);document.activeElement?.blur();setTimeout(()=>document.activeElement?.blur(),50);}
+    };
+    list.addEventListener('click',handler);
+    list.addEventListener('touchend',handler,{passive:false});
+  }
   pieces.forEach((p,i)=>{
     const card=document.createElement('div');
     card.className='piece-card'+(i===selectedPieceIdx?' selected':'');
     if(placedPieces.has(i))card.classList.add('placed');
-    card.onclick=()=>{selectPiece(i);card.blur();document.activeElement?.blur();};
+    if(i===selectedPieceIdx){card.style.setProperty('box-shadow','inset 0 0 0 3px #2196f3','important');}
+    else{card.style.setProperty('box-shadow','none','important');}
+    card.dataset.idx=i;
     const canvas=document.createElement('canvas');
     canvas.width=200;canvas.height=100;card.appendChild(canvas);
     const nameEl=document.createElement('div');
@@ -641,6 +660,11 @@ function updatePieceCards(){
   const cards=document.querySelectorAll('.piece-card');
   cards.forEach((card,i)=>{
     card.className='piece-card'+(i===selectedPieceIdx?' selected':'')+(placedPieces.has(i)?' placed':'');
+    if(i===selectedPieceIdx){
+      card.style.setProperty('box-shadow','inset 0 0 0 3px #2196f3','important');
+    }else{
+      card.style.setProperty('box-shadow','none','important');
+    }
     const badge=card.querySelector('.badge');
     if(badge)badge.textContent=placedPieces.has(i)?'✓ おいた':`${pieces[i].blocks.length}コ`;
     renderMiniPiece(i);
@@ -656,7 +680,7 @@ function selectPiece(i){
 }
 function autoSelectNext(){
   for(let i=0;i<pieces.length;i++){if(!placedPieces.has(i)){selectPiece(i);return;}}
-  selectedPieceIdx=-1;
+  selectedPieceIdx=-1;updatePieceCards();
 }
 
 // ==========================================
@@ -737,7 +761,7 @@ function placePiece(pieceIdx,pos){
     })();
   });
   placedPieces.set(pieceIdx,{blocks:wb,meshes});
-  clearPreview();autoSelectNext();checkComplete();
+  previewPos=null;lastValidPos=null;clearPreview();autoSelectNext();checkComplete();
   return true;
 }
 window.removePlacedPiece=function(){
@@ -803,14 +827,17 @@ function getGridCell(e){
   }
   return null;
 }
-renderer.domElement.addEventListener('mousedown',e=>{mouseDownPos={x:e.clientX,y:e.clientY};});
+let lastTouchTime=0;
+renderer.domElement.addEventListener('mousedown',e=>{if(Date.now()-lastTouchTime<500)return;mouseDownPos={x:e.clientX,y:e.clientY};});
 renderer.domElement.addEventListener('mousemove',e=>{
+  if(Date.now()-lastTouchTime<500)return;
   const cell=getGridCell(e);
   if(cell&&selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
     previewPos={x:cell.x,y:cell.y,z:cell.z};updatePreview();
   }else{clearPreview();}
 });
 renderer.domElement.addEventListener('mouseup',e=>{
+  if(Date.now()-lastTouchTime<500)return;
   const dx=e.clientX-mouseDownPos.x,dy=e.clientY-mouseDownPos.y;
   if(Math.sqrt(dx*dx+dy*dy)>5)return;
   const cell=getGridCell(e);if(!cell)return;
@@ -859,6 +886,7 @@ renderer.domElement.addEventListener('touchend',e=>{
   const dx=t.clientX-touchStart.x,dy=t.clientY-touchStart.y;
   const dist=Math.sqrt(dx*dx+dy*dy);
   touchStart=null;
+  lastTouchTime=Date.now();
   clearPreview();
   if(selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
     const pos=lastValidPos||(dist<15?getGridCell({clientX:t.clientX,clientY:t.clientY}):null);
