@@ -29,8 +29,11 @@
     background: #f5f9fc; cursor: pointer; transition: all 0.2s;
     border: 3px solid transparent; text-align: center;
   }
-  .piece-card:hover { background: #e3f2fd; }
+  @media (hover: hover) { .piece-card:hover { background: #e3f2fd; } }
   .piece-card.selected { border-color: #2196f3; background: #e3f2fd; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
+  .piece-card { -webkit-tap-highlight-color: transparent; outline: none; -webkit-appearance: none; appearance: none; }
+  .piece-card:focus, .piece-card:active, .piece-card:focus-visible { outline: none; border-color: transparent; box-shadow: none; }
+  .piece-card.selected:focus, .piece-card.selected:active { border-color: #2196f3; box-shadow: 0 0 0 2px rgba(33,150,243,0.3); }
   .piece-card.placed { opacity: 0.3; }
   .piece-card canvas { width: 100%; height: 70px; border-radius: 8px; }
   .piece-card .name { font-size: 0.8rem; margin-top: 2px; color: #555; font-weight: bold; }
@@ -591,7 +594,7 @@ function createPieceCards(){
     const card=document.createElement('div');
     card.className='piece-card'+(i===selectedPieceIdx?' selected':'');
     if(placedPieces.has(i))card.classList.add('placed');
-    card.onclick=()=>selectPiece(i);
+    card.onclick=()=>{selectPiece(i);card.blur();document.activeElement?.blur();};
     const canvas=document.createElement('canvas');
     canvas.width=200;canvas.height=100;card.appendChild(canvas);
     const nameEl=document.createElement('div');
@@ -669,6 +672,7 @@ function updateProgress(){
 // プレビュー
 // ==========================================
 let previewPos=null;
+let lastValidPos=null;
 function clearPreview(){
   while(previewGroup.children.length){
     const c=previewGroup.children[0];c.geometry?.dispose();c.material?.dispose();previewGroup.remove(c);
@@ -687,6 +691,7 @@ function updatePreview(){
     if(!valid)allValid=false;
     return{wx,wy,wz,valid};
   });
+  if(allValid) lastValidPos={x:previewPos.x,y:previewPos.y,z:previewPos.z};
   const previewColor = allValid ? new THREE.Color(p.color) : new THREE.Color(0xff1744);
   positions.forEach(({wx,wy,wz})=>{
     const geo=new THREE.BoxGeometry(0.93,0.93,0.93);
@@ -817,13 +822,53 @@ renderer.domElement.addEventListener('mouseup',e=>{
     return;
   }
   if(selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
-    if(!placePiece(selectedPieceIdx,{x:cell.x,y:cell.y,z:cell.z})){
+    const pos=lastValidPos||getGridCell(e);
+    if(pos&&!placePiece(selectedPieceIdx,{x:pos.x,y:pos.y,z:pos.z})){
       showFeedback('ここには おけないよ');
       document.getElementById('feedback').style.color='#e53935';
     }
+    lastValidPos=null;
   }
 });
 renderer.domElement.addEventListener('contextmenu',e=>e.preventDefault());
+
+// タッチ操作（iPad対応）
+let touchStart=null;
+renderer.domElement.addEventListener('touchstart',e=>{
+  if(e.touches.length===1){
+    const t=e.touches[0];
+    touchStart={x:t.clientX,y:t.clientY,time:Date.now()};
+    const cell=getGridCell({clientX:t.clientX,clientY:t.clientY});
+    if(cell&&selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
+      previewPos={x:cell.x,y:cell.y,z:cell.z};updatePreview();
+    }
+  }
+},{passive:true});
+renderer.domElement.addEventListener('touchmove',e=>{
+  if(e.touches.length===1&&touchStart){
+    const t=e.touches[0];
+    const cell=getGridCell({clientX:t.clientX,clientY:t.clientY});
+    if(cell&&selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
+      previewPos={x:cell.x,y:cell.y,z:cell.z};updatePreview();
+    }else{clearPreview();}
+  }
+},{passive:true});
+renderer.domElement.addEventListener('touchend',e=>{
+  if(!touchStart)return;
+  const t=e.changedTouches[0];
+  const dx=t.clientX-touchStart.x,dy=t.clientY-touchStart.y;
+  const dist=Math.sqrt(dx*dx+dy*dy);
+  touchStart=null;
+  clearPreview();
+  if(selectedPieceIdx>=0&&!placedPieces.has(selectedPieceIdx)){
+    const pos=lastValidPos||(dist<15?getGridCell({clientX:t.clientX,clientY:t.clientY}):null);
+    if(pos&&placePiece(selectedPieceIdx,{x:pos.x,y:pos.y,z:pos.z})){
+      lastValidPos=null;
+    }else{
+      lastValidPos=null;
+    }
+  }
+},{passive:true});
 
 // ==========================================
 // キーボード操作
