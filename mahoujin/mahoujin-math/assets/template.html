@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>魔方陣パズル</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>魔方陣パズル</h1>
+    <div class="instructions">
+        <p>数字をドラッグして魔方陣を完成させましょう。各行・列・対角線の合計が同じになるように配置してください。</p>
+        <p>目標合計: <span id="target-sum">15</span></p>
+    </div>
+
+    <div class="game-container">
+        <div class="magic-square" id="magic-square">
+            <!-- 魔方陣のセルがここに生成されます -->
+        </div>
+
+        <div class="number-pool">
+            <h3>数字</h3>
+            <div id="number-pool">
+                <!-- 使用可能な数字がここに表示されます -->
+            </div>
+        </div>
+    </div>
+
+    <div class="controls">
+        <button id="check-btn">チェック</button>
+        <button id="reset-btn">リセット</button>
+        <button id="hint-btn">ヒント</button>
+    </div>
+
+    <div class="feedback" id="feedback"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>
