@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>タングラムパズル</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Hiragino Maru Gothic ProN','Rounded Mplus 1c','Yu Gothic',sans-serif;
+  background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);
+  min-height:100vh;color:#333;user-select:none;display:flex;flex-direction:column;align-items:center}
+
+#header{width:100%;padding:10px 20px;background:rgba(255,255,255,0.92);
+  display:flex;align-items:center;justify-content:space-between;
+  box-shadow:0 2px 12px rgba(0,0,0,0.1);z-index:10}
+#header h1{font-size:1.2rem;color:#1a1a2e}
+#badge{background:#e74c3c;color:#fff;padding:4px 14px;border-radius:20px;font-size:0.85rem;font-weight:bold}
+
+#main{flex:1;display:flex;flex-direction:column;align-items:center;padding:12px;gap:12px;width:100%;max-width:700px}
+
+#title{background:rgba(255,255,255,0.95);border-radius:16px;padding:8px 24px;text-align:center;
+  box-shadow:0 4px 20px rgba(0,0,0,0.15);font-size:1.1rem;font-weight:bold;color:#1a1a2e}
+
+#progress{width:100%;max-width:400px;height:8px;background:rgba(255,255,255,0.3);border-radius:4px;overflow:hidden}
+#progFill{height:100%;background:linear-gradient(90deg,#00b894,#55efc4);border-radius:4px;transition:width .5s;width:0%}
+
+canvas{background:rgba(255,255,255,0.95);border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.2);
+  cursor:pointer;touch-action:none;max-width:100%}
+
+#controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.btn{padding:10px 18px;border:none;border-radius:12px;background:rgba(255,255,255,0.9);
+  font-size:0.9rem;cursor:pointer;font-weight:bold;box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  transition:all .2s;font-family:inherit}
+.btn:hover{transform:scale(1.05);background:#fff}
+.btn-green{background:#2ecc71;color:#fff}
+.btn-green:hover{background:#27ae60}
+.btn-red{background:#e74c3c;color:#fff}
+.btn-red:hover{background:#c0392b}
+
+#msg{background:rgba(255,255,255,0.85);border-radius:12px;padding:8px 20px;text-align:center;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);max-width:500px;font-size:0.9rem;color:#333;min-height:2.2em}
+
+#score{position:fixed;top:60px;right:20px;background:rgba(255,255,255,0.9);border-radius:14px;
+  padding:10px 16px;z-index:10;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.1)}
+#score .label{font-size:0.75rem;color:#888}
+#score .val{font-size:1.4rem;font-weight:bold;color:#1a1a2e}
+
+#overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:none;align-items:center;
+  justify-content:center;z-index:100}
+#overlay.show{display:flex}
+#popup{background:linear-gradient(135deg,#1a1a2e,#16213e);border-radius:20px;padding:32px 40px;
+  text-align:center;color:#fff;animation:popIn .4s ease}
+@keyframes popIn{0%{transform:scale(0.3);opacity:0}100%{transform:scale(1);opacity:1}}
+#popup h2{font-size:1.6rem;margin-bottom:8px}
+#popup p{opacity:0.8;margin-bottom:16px}
+
+@media(max-width:600px){
+  #header h1{font-size:1rem}
+  #score{top:auto;bottom:10px;right:10px;padding:6px 10px}
+}
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>タングラムパズル</h1>
+  <span id="badge">Q1</span>
+</div>
+
+<div id="main">
+  <div id="title">タングラムに挑戦</div>
+  <div id="progress"><div id="progFill"></div></div>
+  <canvas id="cv" width="500" height="700"></canvas>
+  <div id="controls">
+    <button class="btn" onclick="rotatePiece()">↻ かいてん</button>
+    <button class="btn" onclick="flipPiece()">↔ はんてん</button>
+    <button class="btn btn-green" onclick="checkAnswer()">✓ はんてい</button>
+    <button class="btn" onclick="prevPuzzle()">◀ もどる</button>
+    <button class="btn" onclick="nextPuzzleBtn()">つぎへ ▶</button>
+    <button class="btn" onclick="resetPuzzle()">やりなおし</button>
+    <button class="btn" onclick="showHint()">ヒント</button>
+    <button class="btn btn-red" onclick="showAnswer()">こたえ</button>
+  </div>
+  <div id="msg">ピースをドラッグしてシルエットを埋めよう！</div>
+</div>
+
+<div id="score">
+  <div class="label">クリア</div>
+  <div class="val" id="scoreVal">0</div>
+</div>
+
+<div id="overlay">
+  <div id="popup"></div>
+</div>
+
+<script>
+// =============================================
+// パズルデータ (KiloGram SVG由来、正規化済み)
+// =============================================
+const PUZZLES = [
+  { id:"Q1",difficulty:3,title:"正方形",
+    silhouette:[[[0, 0], [0, 8], [8, 8], [8, 0]]],
+    pieces:[[[4, 4], [8, 8], [0, 8]], [[4, 4], [8, 0], [8, 8]], [[0, 0], [4, 0], [0, 4]], [[2, 6], [0, 8], [0, 4]], [[4, 4], [2, 2], [6, 2]], [[0, 4], [2, 2], [4, 4], [2, 6]], [[8, 0], [4, 0], [2, 2], [6, 2]]],
+    hints:[],
+    hint:"大きい三角形を対角に置こう" },
+  { id:"Q2",difficulty:4,title:"はくちょう",
+    silhouette:[[[0.37, 1.76], [2.13, 1.76], [2.13, 2.49], [0.88, 3.74], [0.88, 6.24], [2.65, 8], [6.17, 8], [5.14, 6.97], [7.63, 4.47], [2.65, 4.47], [3.38, 3.74], [3.38, 1.25], [2.13, 0]]],
+    pieces:[[[2.65, 8], [2.65, 4.47], [6.17, 8]], [[5.14, 6.97], [2.65, 4.47], [7.63, 4.47]], [[0.88, 6.24], [2.65, 4.47], [2.65, 8]], [[2.13, 1.76], [0.37, 1.76], [2.13, 0]], [[2.13, 4.99], [0.88, 6.24], [0.88, 3.74]], [[2.13, 2.49], [3.38, 3.74], [2.13, 4.99], [0.88, 3.74]], [[2.13, 0], [2.13, 2.49], [3.38, 3.74], [3.38, 1.25]]],
+    hints:[],
+    hint:"首の細い部分に注目" },
+  { id:"Q3",difficulty:4,title:"ねこ",
+    silhouette:[[[0.37, 0], [0.37, 2.49], [1.61, 3.74], [3.38, 3.74], [5.14, 5.51], [5.14, 6.97], [4.11, 8], [7.63, 8], [7.63, 4.47], [5.14, 1.98], [3.38, 1.98], [2.86, 2.49], [2.86, 0], [1.61, 1.25]]],
+    pieces:[[[7.63, 4.47], [5.14, 6.97], [5.14, 1.98]], [[7.63, 8], [4.11, 8], [7.63, 4.47]], [[3.38, 3.74], [5.14, 1.98], [5.14, 5.51]], [[1.61, 1.25], [0.37, 2.49], [0.37, 0]], [[1.61, 1.25], [2.86, 0], [2.86, 2.49]], [[1.61, 1.25], [2.86, 2.49], [1.61, 3.74], [0.37, 2.49]], [[1.61, 3.74], [3.38, 1.98], [5.14, 1.98], [3.38, 3.74]]],
+    hints:[],
+    hint:"体の大きい部分から作ろう" },
+  { id:"Q4",difficulty:4,title:"とり",
+    silhouette:[[[8.0, 2.0], [4.0, 2.0], [0.0, 2.0], [2.0, 4.0], [2.0, 6.0], [3.0, 5.0], [4.0, 4.0], [6.0, 6.0], [6.0, 4.0]]],
+    pieces:[[[3.0, 3.0], [4.0, 2.0], [5.0, 3.0], [4.0, 4.0]], [[2.0, 4.0], [2.0, 6.0], [3.0, 5.0], [3.0, 3.0]], [[3.0, 5.0], [4.0, 4.0], [3.0, 3.0]], [[6.0, 4.0], [4.0, 4.0], [5.0, 3.0]], [[6.0, 6.0], [6.0, 4.0], [4.0, 4.0]], [[2.0, 4.0], [4.0, 2.0], [0.0, 2.0]], [[6.0, 4.0], [8.0, 2.0], [4.0, 2.0]]],
+    hints:[],
+    hint:"つばさを広げた形だよ" },
+  { id:"Q5",difficulty:4,title:"やま",
+    silhouette:[[[0, 5.61], [8, 5.61], [5.33, 2.94], [4.94, 3.33], [4, 2.39], [3.06, 3.33], [2.67, 2.94]]],
+    pieces:[[[2.67, 5.61], [0, 5.61], [2.67, 2.94]], [[5.33, 5.61], [5.33, 2.94], [8, 5.61]], [[4, 4.28], [5.33, 2.94], [5.33, 5.61]], [[2.67, 5.61], [2.67, 4.28], [4, 5.61]], [[4, 5.61], [4, 4.28], [5.33, 5.61]], [[4, 2.39], [4.94, 3.33], [4, 4.28], [3.06, 3.33]], [[2.67, 2.94], [4, 4.28], [4, 5.61], [2.67, 4.28]]],
+    hints:[],
+    hint:"山の稜線に注目" },
+  { id:"Q6",difficulty:5,title:"いえ",
+    silhouette:[[[2.37, 4.8], [1.6, 4.8], [3.2, 6.4], [3.2, 8.0], [4.8, 8.0], [4.8, 6.4], [6.4, 4.8], [5.57, 4.8], [5.57, 1.6], [3.97, 0.0], [2.37, 1.6]]],
+    pieces:[[[4.8, 6.4], [3.2, 6.4], [3.2, 8.0], [4.8, 8.0]], [[3.2, 6.4], [4.8, 6.4], [3.2, 4.8], [1.6, 4.8]], [[3.97, 1.6], [2.37, 1.6], [3.97, 0.0]], [[5.57, 1.6], [3.97, 1.6], [3.97, 0.0]], [[4.8, 6.4], [3.2, 4.8], [6.4, 4.8]], [[2.37, 4.8], [5.57, 1.6], [2.37, 1.6]], [[5.57, 4.8], [2.37, 4.8], [5.57, 1.6]]],
+    hints:[],
+    hint:"屋根から作ってみよう" },
+  { id:"Q7",difficulty:5,title:"うま",
+    silhouette:[[[5.1, 2.4], [3.4, 2.4], [0.0, 2.4], [0.0, 5.8], [3.4, 5.8], [5.1, 5.8], [5.1, 5.1], [6.8, 5.1], [6.8, 5.8], [8.0, 4.6], [8.0, 2.2], [6.8, 3.4], [5.1, 3.4]]],
+    pieces:[[[6.8, 5.1], [6.8, 3.4], [5.1, 3.4], [5.1, 5.1]], [[8.0, 4.6], [8.0, 2.2], [6.8, 3.4], [6.8, 5.8]], [[5.1, 5.8], [3.4, 5.8], [5.1, 4.1]], [[5.1, 4.1], [3.4, 2.4], [5.1, 2.4]], [[3.4, 5.8], [5.1, 4.1], [3.4, 2.4]], [[3.4, 5.8], [0.0, 5.8], [3.4, 2.4]], [[0.0, 5.8], [3.4, 2.4], [0.0, 2.4]]],
+    hints:[],
+    hint:"足の向きがポイント" },
+  { id:"Q8",difficulty:5,title:"あひる",
+    silhouette:[[[1.63, 2.78], [0.81, 3.59], [0.0, 4.41], [1.62, 4.41], [0.81, 5.22], [4.07, 5.22], [5.7, 5.22], [8.0, 5.22], [6.85, 4.07], [6.51, 4.41], [4.88, 2.78], [3.26, 4.41], [2.44, 3.59]]],
+    pieces:[[[0.81, 3.59], [1.63, 2.78], [2.44, 3.59], [1.63, 4.41]], [[3.26, 4.41], [4.88, 4.41], [5.7, 5.22], [4.07, 5.22]], [[5.7, 5.22], [4.88, 4.41], [6.51, 4.41]], [[0.0, 4.41], [1.63, 4.41], [0.81, 3.59]], [[8.0, 5.22], [5.7, 5.22], [6.85, 4.07]], [[4.07, 5.22], [0.81, 5.22], [2.44, 3.59]], [[3.26, 4.41], [6.51, 4.41], [4.88, 2.78]]],
+    hints:[],
+    hint:"くちばしの形に注目" },
+  { id:"Q9",difficulty:5,title:"ぞう",
+    silhouette:[[[8.0, 2.34], [6.06, 2.34], [4.12, 2.34], [3.15, 3.31], [2.75, 2.91], [0.0, 2.91], [0.0, 5.66], [2.75, 5.66], [4.12, 5.66], [4.12, 4.28], [5.09, 3.31], [7.03, 3.31]]],
+    pieces:[[[5.09, 3.31], [4.12, 4.28], [3.15, 3.31], [4.12, 2.34]], [[6.06, 2.34], [7.03, 3.31], [5.09, 3.31], [4.12, 2.34]], [[7.03, 3.31], [6.06, 2.34], [8.0, 2.34]], [[4.12, 5.66], [2.75, 5.66], [4.12, 4.28]], [[2.75, 5.66], [4.12, 4.28], [2.75, 2.91]], [[2.75, 5.66], [0.0, 2.91], [2.75, 2.91]], [[0.0, 5.66], [2.75, 5.66], [0.0, 2.91]]],
+    hints:[],
+    hint:"大きな体から作ろう" },
+  { id:"Q10",difficulty:5,title:"いぬ",
+    silhouette:[[[2.0, 2.83], [2.0, 4.0], [2.86, 4.0], [2.86, 6.0], [0.86, 8.0], [2.86, 8.0], [6.86, 8.0], [4.86, 6.0], [4.86, 4.0], [6.0, 4.0], [6.0, 2.83], [7.41, 1.41], [6.0, 0.0], [2.0, 0.0], [0.59, 1.41]]],
+    pieces:[[[4.86, 4.0], [2.86, 4.0], [2.86, 6.0], [4.86, 6.0]], [[2.86, 8.0], [0.86, 8.0], [2.86, 6.0], [4.86, 6.0]], [[6.0, 2.83], [7.41, 1.41], [6.0, 0.0]], [[2.0, 2.83], [0.59, 1.41], [2.0, 0.0]], [[6.86, 8.0], [2.86, 8.0], [4.86, 6.0]], [[2.0, 4.0], [6.0, 4.0], [2.0, 0.0]], [[6.0, 4.0], [2.0, 0.0], [6.0, 0.0]]],
+    hints:[],
+    hint:"しっぽの向きに注意" },
+];
+
+// =============================================
+// 定数・状態
+// =============================================
+const COLORS = ['#e74c3c','#e67e22','#f1c40f','#2ecc71','#3498db','#9b59b6','#1abc9c'];
+const COLORS_LIGHT = ['#f5a6a6','#f5c28a','#f7e07a','#8ee0b0','#8ec5e8','#c9a3d9','#7dd3c5'];
+const UNIT = 50; // 1座標単位のピクセル数
+const TRAY_Y_OFFSET = 10; // シルエット下端からトレイまでの座標単位
+
+let curQ = 0, cleared = 0;
+let pieces = []; // {pts, dx, dy, rot, flip, isHint}
+let selIdx = -1, dragging = false, dragOff = {x:0, y:0};
+let showingAnswer = false;
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+
+// =============================================
+// ユーティリティ
+// =============================================
+function centroid(pts) {
+  let cx=0, cy=0;
+  for (const p of pts) { cx += p[0]; cy += p[1]; }
+  return [cx/pts.length, cy/pts.length];
+}
+
+function transformPts(pc) {
+  let pts = pc.pts.map(p => [p[0], p[1]]);
+  const c = centroid(pts);
+  if (pc.flip) {
+    pts = pts.map(p => [2*c[0]-p[0], p[1]]);
+  }
+  if (pc.rot !== 0) {
+    const c2 = centroid(pts);
+    const rad = pc.rot * Math.PI / 180;
+    const cos = Math.cos(rad), sin = Math.sin(rad);
+    pts = pts.map(p => {
+      const dx = p[0]-c2[0], dy = p[1]-c2[1];
+      return [c2[0]+dx*cos-dy*sin, c2[1]+dx*sin+dy*cos];
+    });
+  }
+  return pts.map(p => [p[0]+pc.dx, p[1]+pc.dy]);
+}
+
+function silBounds(pz) {
+  let x0=1e9, y0=1e9, x1=-1e9, y1=-1e9;
+  for (const s of pz.silhouette) for (const p of s) {
+    x0=Math.min(x0,p[0]); y0=Math.min(y0,p[1]);
+    x1=Math.max(x1,p[0]); y1=Math.max(y1,p[1]);
+  }
+  return {x0, y0, x1, y1};
+}
+
+function toCanvas(x, y, ox, oy) {
+  return [(x - ox) * UNIT + 30, (y - oy) * UNIT + 30];
+}
+
+function fromCanvas(cx, cy, ox, oy) {
+  return [(cx - 30) / UNIT + ox, (cy - 30) / UNIT + oy];
+}
+
+function pointInPoly(px, py, pts) {
+  let inside = false;
+  for (let i=0, j=pts.length-1; i<pts.length; j=i++) {
+    const xi=pts[i][0], yi=pts[i][1], xj=pts[j][0], yj=pts[j][1];
+    if (((yi>py) !== (yj>py)) && (px < (xj-xi)*(py-yi)/(yj-yi)+xi))
+      inside = !inside;
+  }
+  return inside;
+}
+
+// =============================================
+// 描画
+// =============================================
+let originX = 0, originY = 0;
+
+function draw() {
+  const pz = PUZZLES[curQ];
+  const b = silBounds(pz);
+  const silW = b.x1 - b.x0;
+  const silH = b.y1 - b.y0;
+
+  // レイアウト: 左にシルエット、右にピーストレイ
+  const trayW = 6; // トレイの幅（座標単位）
+  const totalW = silW + trayW + 3; // 間隔含む
+  const totalH = Math.max(silH, 10);
+
+  originX = b.x0 - 0.5;
+  originY = b.y0 - 0.5;
+
+  const cw = (totalW + 2) * UNIT;
+  const ch = (totalH + 2) * UNIT;
+  cv.width = cw;
+  cv.height = ch;
+
+  ctx.clearRect(0, 0, cw, ch);
+
+  // 背景グリッド
+  ctx.strokeStyle = 'rgba(0,0,0,0.04)';
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx <= cw; gx += UNIT) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, ch); ctx.stroke();
+  }
+  for (let gy = 0; gy <= ch; gy += UNIT) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(cw, gy); ctx.stroke();
+  }
+
+  // シルエット（枠：黒塗り）
+  for (const s of pz.silhouette) {
+    ctx.beginPath();
+    const p0 = toCanvas(s[0][0], s[0][1], originX, originY);
+    ctx.moveTo(p0[0], p0[1]);
+    for (let i=1; i<s.length; i++) {
+      const p = toCanvas(s[i][0], s[i][1], originX, originY);
+      ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#2c3e50';
+    ctx.fill();
+    ctx.strokeStyle = '#1a252f';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // （ピース境界線ガイドなし）
+
+  // 右トレイ背景とセル枠
+  const trayLeft = b.x1 + 2;
+  const trayTop2 = b.y0;
+  const trayColW = 3.5;
+  const trayRowH = 2.8;
+  const nonHintCount = pieces.filter(p => !p.isHint).length;
+  const trayRows = Math.ceil(nonHintCount / 2);
+
+  // トレイ背景
+  const tlp = toCanvas(trayLeft - 0.3, trayTop2 - 0.3, originX, originY);
+  const trw = (2 * trayColW + 0.6) * UNIT;
+  const trh = (trayRows * trayRowH + 0.6) * UNIT;
+  ctx.fillStyle = 'rgba(200,200,200,0.08)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(tlp[0], tlp[1], trw, trh, 8);
+  ctx.fill();
+  ctx.stroke();
+
+  // トレイラベル
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  ctx.font = '13px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('ピース', tlp[0] + 4, tlp[1] - 18);
+
+  // セル枠（点線）
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.setLineDash([4, 3]);
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r < trayRows; r++) {
+    for (let c = 0; c < 2; c++) {
+      const cp = toCanvas(trayLeft + c * trayColW, trayTop2 + r * trayRowH, originX, originY);
+      ctx.strokeRect(cp[0], cp[1], trayColW * UNIT, trayRowH * UNIT);
+    }
+  }
+  ctx.setLineDash([]);
+
+  // ピース描画（選択ピースを最後に）
+  const order = pieces.map((_, i) => i).sort((a, b) => {
+    if (a === selIdx) return 1;
+    if (b === selIdx) return -1;
+    return 0;
+  });
+
+  for (const i of order) {
+    const pc = pieces[i];
+    const pts = transformPts(pc);
+    ctx.beginPath();
+    const p0 = toCanvas(pts[0][0], pts[0][1], originX, originY);
+    ctx.moveTo(p0[0], p0[1]);
+    for (let j=1; j<pts.length; j++) {
+      const p = toCanvas(pts[j][0], pts[j][1], originX, originY);
+      ctx.lineTo(p[0], p[1]);
+    }
+    ctx.closePath();
+
+    if (pc.isHint) {
+      ctx.fillStyle = COLORS_LIGHT[i % 7] + '99';
+      ctx.fill();
+      ctx.strokeStyle = COLORS[i % 7] + '66';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = COLORS[i % 7] + 'cc';
+      ctx.fill();
+      ctx.strokeStyle = i === selIdx ? '#fff' : (showingAnswer ? '#fff' : 'rgba(0,0,0,0.3)');
+      ctx.lineWidth = i === selIdx ? 3 : (showingAnswer ? 2.5 : 1.5);
+      ctx.stroke();
+      if (i === selIdx) {
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+
+    // こたえ表示時はピース番号を描画
+    if (showingAnswer) {
+      const c = centroid(pts);
+      const cp = toCanvas(c[0], c[1], originX, originY);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 16px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(String(i+1), cp[0], cp[1]);
+    }
+  }
+}
+
+// =============================================
+// パズル読み込み
+// =============================================
+function loadPuzzle(idx) {
+  curQ = idx;
+  selIdx = -1;
+  const pz = PUZZLES[idx];
+  document.getElementById('badge').textContent = pz.id + ' ' + pz.title;
+  document.getElementById('title').textContent = pz.title + ' ' + '★'.repeat(pz.difficulty) + '☆'.repeat(5-pz.difficulty);
+  document.getElementById('progFill').style.width = (cleared/PUZZLES.length*100) + '%';
+  document.getElementById('msg').textContent = 'ピースをドラッグしてシルエットを埋めよう！';
+
+  const b = silBounds(pz);
+  const silH = b.y1 - b.y0;
+
+  // ピーストレイは右側
+  const trayLeft = b.x1 + 2;
+  const trayTop = b.y0;
+  const trayColW = 3.5; // 各列の幅
+  const trayRowH = 2.8; // 各行の高さ
+  let nonHintIdx = 0;
+  showingAnswer = false;
+
+  // 非ヒントピースの情報を事前計算
+  const nonHintPieces = [];
+  pz.pieces.forEach((pts, i) => {
+    if (!pz.hints.includes(i)) {
+      // ピースのバウンディングボックス
+      let px0=1e9, py0=1e9, px1=-1e9, py1=-1e9;
+      for (const p of pts) { px0=Math.min(px0,p[0]); py0=Math.min(py0,p[1]); px1=Math.max(px1,p[0]); py1=Math.max(py1,p[1]); }
+      nonHintPieces.push({idx:i, pts, w:px1-px0, h:py1-py0, cx:(px0+px1)/2, cy:(py0+py1)/2});
+    }
+  });
+
+  pieces = pz.pieces.map((pts, i) => {
+    const isHint = pz.hints.includes(i);
+    if (isHint) {
+      return {pts, dx:0, dy:0, rot:0, flip:false, isHint:true};
+    } else {
+      const info = nonHintPieces[nonHintIdx];
+      const col = nonHintIdx % 2;
+      const row = Math.floor(nonHintIdx / 2);
+      // トレイセルの中心
+      const cellCx = trayLeft + col * trayColW + trayColW / 2;
+      const cellCy = trayTop + row * trayRowH + trayRowH / 2;
+      nonHintIdx++;
+      return {pts, dx:cellCx - info.cx, dy:cellCy - info.cy, rot:0, flip:false, isHint:false};
+    }
+  });
+
+  draw();
+}
+
+// =============================================
+// マウス/タッチイベント
+// =============================================
+function getPos(e) {
+  const rect = cv.getBoundingClientRect();
+  const scaleX = cv.width / rect.width;
+  const scaleY = cv.height / rect.height;
+  let clientX, clientY;
+  if (e.touches) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else if (e.changedTouches) {
+    clientX = e.changedTouches[0].clientX;
+    clientY = e.changedTouches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+  return fromCanvas((clientX - rect.left) * scaleX, (clientY - rect.top) * scaleY, originX, originY);
+}
+
+function hitTest(ux, uy) {
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    if (pieces[i].isHint) continue;
+    const pts = transformPts(pieces[i]);
+    if (pointInPoly(ux, uy, pts)) return i;
+  }
+  return -1;
+}
+
+cv.addEventListener('mousedown', onDown);
+cv.addEventListener('mousemove', onMove);
+cv.addEventListener('mouseup', onUp);
+cv.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, {passive:false});
+cv.addEventListener('touchmove', e => { e.preventDefault(); onMove(e); }, {passive:false});
+cv.addEventListener('touchend', e => { e.preventDefault(); onUp(e); });
+
+function onDown(e) {
+  const [ux, uy] = getPos(e);
+  const hit = hitTest(ux, uy);
+  if (hit >= 0) {
+    selIdx = hit;
+    dragging = true;
+    const pts = transformPts(pieces[hit]);
+    const c = centroid(pts);
+    dragOff = {x: ux - c[0], y: uy - c[1]};
+    draw();
+  } else {
+    selIdx = -1;
+    dragging = false;
+    draw();
+  }
+}
+
+function onMove(e) {
+  if (!dragging || selIdx < 0) return;
+  const [ux, uy] = getPos(e);
+  const pts = transformPts(pieces[selIdx]);
+  const c = centroid(pts);
+  const newCx = ux - dragOff.x;
+  const newCy = uy - dragOff.y;
+  pieces[selIdx].dx += newCx - c[0];
+  pieces[selIdx].dy += newCy - c[1];
+  draw();
+}
+
+function onUp() { dragging = false; }
+
+// =============================================
+// キーボード（矢印キー微調整）
+// =============================================
+document.addEventListener('keydown', e => {
+  if (selIdx < 0 || pieces[selIdx].isHint) return;
+  const step = 0.1;
+  switch(e.key) {
+    case 'ArrowUp': pieces[selIdx].dy -= step; break;
+    case 'ArrowDown': pieces[selIdx].dy += step; break;
+    case 'ArrowLeft': pieces[selIdx].dx -= step; break;
+    case 'ArrowRight': pieces[selIdx].dx += step; break;
+    default: return;
+  }
+  e.preventDefault();
+  draw();
+});
+
+// =============================================
+// ボタン操作
+// =============================================
+function rotatePiece() {
+  if (selIdx < 0 || pieces[selIdx].isHint) {
+    document.getElementById('msg').textContent = 'ピースを選んでね';
+    return;
+  }
+  pieces[selIdx].rot = (pieces[selIdx].rot + 45) % 360;
+  draw();
+}
+
+function flipPiece() {
+  if (selIdx < 0 || pieces[selIdx].isHint) {
+    document.getElementById('msg').textContent = 'ピースを選んでね';
+    return;
+  }
+  pieces[selIdx].flip = !pieces[selIdx].flip;
+  draw();
+}
+
+function resetPuzzle() { loadPuzzle(curQ); }
+
+function prevPuzzle() {
+  if (curQ > 0) loadPuzzle(curQ - 1);
+}
+
+function nextPuzzleBtn() {
+  if (curQ < PUZZLES.length - 1) loadPuzzle(curQ + 1);
+}
+
+function showHint() {
+  document.getElementById('msg').textContent = PUZZLES[curQ].hint;
+  setTimeout(() => {
+    document.getElementById('msg').textContent = 'ピースをドラッグしてシルエットを埋めよう！';
+  }, 3000);
+}
+
+function showAnswer() {
+  pieces.forEach(pc => { pc.dx = 0; pc.dy = 0; pc.rot = 0; pc.flip = false; });
+  showingAnswer = true;
+  draw();
+  document.getElementById('msg').textContent = 'これが正解だよ！';
+}
+
+// =============================================
+// 判定（ピクセルベース、カバー率95%）
+// =============================================
+function checkAnswer() {
+  const SIZE = 200;
+  const pz = PUZZLES[curQ];
+  const b = silBounds(pz);
+  const pad = 0.5;
+  const minX = b.x0-pad, minY = b.y0-pad, maxX = b.x1+pad, maxY = b.y1+pad;
+  const w = maxX-minX, h = maxY-minY;
+  const scale = Math.min(SIZE/w, SIZE/h);
+
+  function toC(px, py) { return [(px-minX)*scale, (py-minY)*scale]; }
+
+  // シルエット描画
+  const c1 = document.createElement('canvas'); c1.width=SIZE; c1.height=SIZE;
+  const x1 = c1.getContext('2d');
+  x1.fillStyle='#000'; x1.fillRect(0,0,SIZE,SIZE);
+  x1.fillStyle='#fff';
+  for (const s of pz.silhouette) {
+    x1.beginPath();
+    const p0 = toC(s[0][0], s[0][1]);
+    x1.moveTo(p0[0], p0[1]);
+    for (let i=1; i<s.length; i++) { const p = toC(s[i][0], s[i][1]); x1.lineTo(p[0], p[1]); }
+    x1.closePath(); x1.fill();
+  }
+
+  // ピース描画
+  const c2 = document.createElement('canvas'); c2.width=SIZE; c2.height=SIZE;
+  const x2 = c2.getContext('2d');
+  x2.fillStyle='#000'; x2.fillRect(0,0,SIZE,SIZE);
+  x2.fillStyle='#fff';
+  for (const pc of pieces) {
+    const pts = transformPts(pc);
+    x2.beginPath();
+    const p0 = toC(pts[0][0], pts[0][1]);
+    x2.moveTo(p0[0], p0[1]);
+    for (let i=1; i<pts.length; i++) { const p = toC(pts[i][0], pts[i][1]); x2.lineTo(p[0], p[1]); }
+    x2.closePath(); x2.fill();
+  }
+
+  // ピクセル比較
+  const d1 = x1.getImageData(0,0,SIZE,SIZE).data;
+  const d2 = x2.getImageData(0,0,SIZE,SIZE).data;
+  let total = 0, covered = 0;
+  for (let i=0; i<d1.length; i+=4) {
+    if (d1[i] > 128) { total++; if (d2[i] > 128) covered++; }
+  }
+  if (total === 0) return;
+
+  const ratio = covered / total;
+  if (ratio >= 0.95) {
+    cleared++;
+    document.getElementById('scoreVal').textContent = cleared;
+    document.getElementById('progFill').style.width = (cleared/PUZZLES.length*100) + '%';
+
+    if (cleared >= PUZZLES.length) {
+      document.getElementById('popup').innerHTML =
+        '<div style="font-size:2.5rem;margin-bottom:12px">🎉🎊🎉</div>' +
+        '<h2>おめでとう！</h2><p>全' + PUZZLES.length + '問クリア！</p>' +
+        '<button class="btn btn-green" onclick="restartAll()">もういちど</button>';
+    } else {
+      const next = curQ + 1 < PUZZLES.length ? curQ + 1 : 0;
+      document.getElementById('popup').innerHTML =
+        '<h2>せいかい！</h2><p>「' + PUZZLES[curQ].title + '」クリア！ (' + Math.round(ratio*100) + '%)</p>' +
+        '<button class="btn btn-green" onclick="nextPuzzle(' + next + ')">つぎへ</button>';
+    }
+    document.getElementById('overlay').classList.add('show');
+  } else {
+    document.getElementById('msg').textContent = 'もうすこし！ (カバー率: ' + Math.round(ratio*100) + '%)';
+  }
+}
+
+function nextPuzzle(idx) {
+  document.getElementById('overlay').classList.remove('show');
+  loadPuzzle(idx);
+}
+
+function restartAll() {
+  document.getElementById('overlay').classList.remove('show');
+  curQ = 0; cleared = 0;
+  document.getElementById('scoreVal').textContent = 0;
+  document.getElementById('progFill').style.width = '0%';
+  loadPuzzle(0);
+}
+
+// 起動
+loadPuzzle(0);
+</script>
+</body>
+</html>

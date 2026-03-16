@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>タングラムパズル</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Rounded Mplus 1c', 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    min-height: 100vh;
+    color: #333;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ヘッダー */
+  #header {
+    width: 100%;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    z-index: 10;
+  }
+  #header h1 { font-size: 1.2rem; color: #1a1a2e; }
+  #level-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+  }
+
+  /* メインエリア */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px;
+    gap: 16px;
+    width: 100%;
+    max-width: 800px;
+  }
+
+  /* 問題タイトル */
+  #puzzle-title {
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 10px 24px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #1a1a2e;
+  }
+
+  /* 進捗バー */
+  #progress-bar {
+    width: 100%;
+    max-width: 400px;
+    height: 8px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00b894, #55efc4);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* パズルエリア */
+  #puzzle-area {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* お手本 */
+  #silhouette-container {
+    text-align: center;
+  }
+  #silhouette-container .label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 8px;
+  }
+  #silhouette-canvas {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+
+  /* ワークスペース */
+  #workspace-container {
+    text-align: center;
+  }
+  #workspace-container .label {
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 8px;
+  }
+  #workspace-canvas {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    cursor: pointer;
+  }
+
+  /* 操作ボタン */
+  #controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .ctrl-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.9);
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { transform: scale(1.05); background: white; }
+
+  /* 操作説明 */
+  #instructions {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 10px 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    max-width: 500px;
+  }
+  #instructions .msg { font-size: 0.9rem; color: #333; }
+  #instructions .sub { font-size: 0.75rem; color: #888; margin-top: 4px; }
+
+  /* スコアパネル */
+  #score-panel {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 14px;
+    padding: 12px 18px;
+    z-index: 10;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #score-panel .label { font-size: 0.75rem; color: #888; }
+  #score-panel .value { font-size: 1.5rem; font-weight: bold; color: #1a1a2e; }
+
+  /* フィードバック */
+  #feedback {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    font-weight: bold;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  #feedback.show {
+    opacity: 1;
+    animation: pop 0.8s ease forwards;
+  }
+
+  @keyframes pop {
+    0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+    40% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+    70% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+  }
+  @keyframes celebrate {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+  }
+
+  /* レスポンシブ */
+  @media (max-width: 700px) {
+    #puzzle-area { flex-direction: column; align-items: center; }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>🔺 タングラムパズル</h1>
+  <span id="level-badge">Q1</span>
+</div>
+
+<div id="main">
+  <div id="puzzle-title">タングラムに挑戦</div>
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+
+  <div id="puzzle-area">
+    <div id="silhouette-container">
+      <div class="label">お手本</div>
+      <canvas id="silhouette-canvas" width="280" height="280"></canvas>
+    </div>
+    <div id="workspace-container">
+      <div class="label">ここにピースを置こう</div>
+      <canvas id="workspace-canvas" width="280" height="280"></canvas>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="resetPuzzle()">🔄 やりなおし</button>
+    <button class="ctrl-btn" onclick="rotatePiece()">↻ 回転</button>
+    <button class="ctrl-btn" onclick="flipPiece()">↔ 反転</button>
+    <button class="ctrl-btn" onclick="showHint()">💡 ヒント</button>
+    <button class="ctrl-btn" onclick="showAnswer()">👀 こたえ</button>
+  </div>
+
+  <div id="instructions">
+    <div class="msg" id="msg-text">ピースをドラッグして配置しよう！</div>
+    <div class="sub">クリックで選択 → 回転・反転ボタンで操作 → ドラッグで移動</div>
+  </div>
+</div>
+
+<div id="score-panel">
+  <div class="label">スコア</div>
+  <div class="value" id="score">0</div>
+</div>
+
+<div id="feedback"></div>
+
+<script>
+// ==========================================
+// パズルデータ（PUZZLES配列をカスタマイズ）
+// ==========================================
+
+/*
+  タングラムの7ピース（単位正方形のサイズ = UNIT）
+  各ピースは多角形の頂点座標で定義。
+  原点(0,0)基準、UNITは正方形の一辺。
+
+  ピース定義（標準タングラム、4×4正方形ベース、合計面積=16）:
+    0: 大三角形A    (面積 = 4)    直角二等辺三角形
+    1: 大三角形B    (面積 = 4)    直角二等辺三角形
+    2: 中三角形     (面積 = 2)    直角二等辺三角形
+    3: 小三角形A    (面積 = 1)    直角二等辺三角形
+    4: 小三角形B    (面積 = 1)    直角二等辺三角形
+    5: 正方形       (面積 = 2)    45度傾いた正方形
+    6: 平行四辺形   (面積 = 2)    平行四辺形
+
+  パズルオブジェクト:
+  {
+    id: "Q1",
+    difficulty: 1,        // 1-5
+    title: "パズル名",
+    silhouette: [...],    // シルエット多角形の頂点（複数ポリゴン可）
+    answer: [             // 各ピースの正解位置
+      { piece: 0, x: 0, y: 0, rotation: 0, flip: false },
+      ...
+    ],
+    hints: [0, 1],        // 最初から配置済みのピースインデックス（answer配列のインデックス）
+    hint: "ヒント文"
+  }
+*/
+
+// 7ピースの基本形状（整数グリッド、4×4正方形ベース、合計面積=16）
+const PIECE_SHAPES = [
+  // 0: 大三角形A (面積=4, 直角二等辺三角形, 脚=2√2)
+  [[0,0],[4,0],[2,2]],
+  // 1: 大三角形B (面積=4, 直角二等辺三角形, 脚=2√2)
+  [[0,0],[4,0],[2,2]],
+  // 2: 中三角形 (面積=2, 直角二等辺三角形, 脚=2)
+  [[0,0],[2,0],[0,2]],
+  // 3: 小三角形A (面積=1, 直角二等辺三角形, 脚=√2)
+  [[0,0],[2,0],[1,1]],
+  // 4: 小三角形B (面積=1, 直角二等辺三角形, 脚=√2)
+  [[0,0],[2,0],[1,1]],
+  // 5: 正方形 (面積=2, 辺=√2, 45度傾き)
+  [[0,0],[1,-1],[2,0],[1,1]],
+  // 6: 平行四辺形 (面積=2)
+  [[0,0],[2,0],[3,1],[1,1]],
+];
+
+// ピースの色
+const PIECE_COLORS = [
+  '#e74c3c', // 赤
+  '#e67e22', // オレンジ
+  '#f1c40f', // 黄色
+  '#2ecc71', // 緑
+  '#3498db', // 青
+  '#9b59b6', // 紫
+  '#1abc9c', // ティール
+];
+
+const PIECE_COLORS_LIGHT = [
+  '#f5a6a6',
+  '#f5c28a',
+  '#f7e07a',
+  '#8ee0b0',
+  '#8ec5e8',
+  '#c9a3d9',
+  '#7dd3c5',
+];
+
+const PUZZLES = [
+  { id: "Q1", difficulty: 1, title: "正方形をつくろう",
+    silhouette: [[[0,0],[4,0],[4,4],[0,4]]],
+    answer: [
+      { piece: 0, x: 0, y: 0, rotation: 0, flip: false },
+      { piece: 1, x: 1.333, y: 1.333, rotation: 90, flip: false },
+      { piece: 2, x: 0, y: 2.667, rotation: 180, flip: true },
+      { piece: 3, x: 1, y: 2.333, rotation: 180, flip: false },
+      { piece: 4, x: -0.667, y: 0.667, rotation: 270, flip: false },
+      { piece: 5, x: 0, y: 2, rotation: 0, flip: false },
+      { piece: 6, x: 1, y: 3, rotation: 0, flip: false },
+    ],
+    hints: [0, 1],
+    hint: "大きい三角形を対角に置いてみよう" },
+];
+
+// ==========================================
+// 定数・設定
+// ==========================================
+const CANVAS_SIZE = 280;
+const GRID_UNIT = 50;   // 1単位のピクセル数
+const SNAP_DIST = 15;   // スナップ距離
+const SNAP_ANGLE = 45;  // スナップ角度
+
+// ==========================================
+// ゲーム状態
+// ==========================================
+let currentPuzzleIdx = 0;
+let totalScore = 0;
+let solved = false;
+
+// 各ピースの現在状態
+let pieces = [];      // { shape, color, x, y, rotation, flip, placed, isHint }
+let selectedIdx = -1; // 選択中のピースインデックス
+let dragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
+
+// Canvas
+let silCanvas, silCtx, wsCanvas, wsCtx;
+
+// ==========================================
+// 初期化
+// ==========================================
+function init() {
+  silCanvas = document.getElementById('silhouette-canvas');
+  silCtx = silCanvas.getContext('2d');
+  wsCanvas = document.getElementById('workspace-canvas');
+  wsCtx = wsCanvas.getContext('2d');
+
+  // イベントリスナー
+  wsCanvas.addEventListener('mousedown', onMouseDown);
+  wsCanvas.addEventListener('mousemove', onMouseMove);
+  wsCanvas.addEventListener('mouseup', onMouseUp);
+  wsCanvas.addEventListener('touchstart', onTouchStart, { passive: false });
+  wsCanvas.addEventListener('touchmove', onTouchMove, { passive: false });
+  wsCanvas.addEventListener('touchend', onTouchEnd);
+
+  if (PUZZLES.length > 0) {
+    loadPuzzle(0);
+  }
+}
+
+// ==========================================
+// パズル読み込み
+// ==========================================
+function loadPuzzle(idx) {
+  if (idx >= PUZZLES.length) { showComplete(); return; }
+  const p = PUZZLES[idx];
+  currentPuzzleIdx = idx;
+  solved = false;
+  selectedIdx = -1;
+
+  // ピース初期化
+  pieces = [];
+  const hintSet = new Set(p.hints || []);
+
+  for (let i = 0; i < 7; i++) {
+    const ans = p.answer[i];
+    const baseShape = PIECE_SHAPES[ans.piece].map(v => [...v]);
+
+    if (hintSet.has(i)) {
+      // ヒントピース: 正解位置に配置
+      pieces.push({
+        pieceIdx: ans.piece,
+        shape: baseShape,
+        color: PIECE_COLORS[ans.piece],
+        colorLight: PIECE_COLORS_LIGHT[ans.piece],
+        x: ans.x,
+        y: ans.y,
+        rotation: ans.rotation,
+        flip: ans.flip,
+        placed: true,
+        isHint: true,
+      });
+    } else {
+      // 未配置ピース: ワークスペース下部にランダム配置
+      const startX = 0.3 + (i % 4) * 1.1;
+      const startY = 4.5 + Math.floor(i / 4) * 1.2;
+      pieces.push({
+        pieceIdx: ans.piece,
+        shape: baseShape,
+        color: PIECE_COLORS[ans.piece],
+        colorLight: PIECE_COLORS_LIGHT[ans.piece],
+        x: startX,
+        y: startY,
+        rotation: 0,
+        flip: false,
+        placed: false,
+        isHint: false,
+      });
+    }
+  }
+
+  // UI更新
+  document.getElementById('level-badge').textContent =
+    `${p.id}  ${'★'.repeat(p.difficulty)}`;
+  document.getElementById('puzzle-title').textContent = p.title;
+  document.getElementById('progress-fill').style.width =
+    `${(idx / PUZZLES.length) * 100}%`;
+  document.getElementById('msg-text').textContent = 'ピースをドラッグして配置しよう！';
+
+  // キャンバスサイズ調整
+  adjustCanvasSize(p);
+
+  drawSilhouette(p);
+  drawWorkspace();
+}
+
+// ==========================================
+// キャンバスサイズ調整
+// ==========================================
+function adjustCanvasSize(puzzle) {
+  // シルエットのバウンディングボックスを計算
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of puzzle.silhouette) {
+    for (const [px, py] of poly) {
+      minX = Math.min(minX, px);
+      minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px);
+      maxY = Math.max(maxY, py);
+    }
+  }
+  const w = maxX - minX;
+  const h = maxY - minY;
+  const maxDim = Math.max(w, h);
+  const canvasPixels = Math.max(280, (maxDim + 1) * GRID_UNIT);
+
+  silCanvas.width = canvasPixels;
+  silCanvas.height = canvasPixels;
+  wsCanvas.width = canvasPixels;
+  // ワークスペースはピース配置用に少し縦に広げる
+  wsCanvas.height = canvasPixels + 120;
+}
+
+// ==========================================
+// シルエット描画
+// ==========================================
+function drawSilhouette(puzzle) {
+  const ctx = silCtx;
+  const w = silCanvas.width;
+  const h = silCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // グリッド背景
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx <= w; gx += GRID_UNIT) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+  }
+  for (let gy = 0; gy <= h; gy += GRID_UNIT) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+  }
+
+  // オフセット計算（中央寄せ）
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of puzzle.silhouette) {
+    for (const [px, py] of poly) {
+      minX = Math.min(minX, px);
+      minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px);
+      maxY = Math.max(maxY, py);
+    }
+  }
+  const offX = (w - (maxX - minX) * GRID_UNIT) / 2 - minX * GRID_UNIT;
+  const offY = (h - (maxY - minY) * GRID_UNIT) / 2 - minY * GRID_UNIT;
+
+  // シルエット描画
+  ctx.fillStyle = '#2c3e50';
+  ctx.strokeStyle = '#1a252f';
+  ctx.lineWidth = 2;
+  for (const poly of puzzle.silhouette) {
+    ctx.beginPath();
+    for (let i = 0; i < poly.length; i++) {
+      const px = poly[i][0] * GRID_UNIT + offX;
+      const py = poly[i][1] * GRID_UNIT + offY;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+// ==========================================
+// ワークスペース描画
+// ==========================================
+function drawWorkspace() {
+  const ctx = wsCtx;
+  const w = wsCanvas.width;
+  const h = wsCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+
+  // グリッド
+  ctx.strokeStyle = 'rgba(0,0,0,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let gx = 0; gx <= w; gx += GRID_UNIT) {
+    ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, h); ctx.stroke();
+  }
+  for (let gy = 0; gy <= h; gy += GRID_UNIT) {
+    ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(w, gy); ctx.stroke();
+  }
+
+  // シルエットガイド（薄く表示）
+  const puzzle = PUZZLES[currentPuzzleIdx];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of puzzle.silhouette) {
+    for (const [px, py] of poly) {
+      minX = Math.min(minX, px);
+      minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px);
+      maxY = Math.max(maxY, py);
+    }
+  }
+  const silW = (maxX - minX) * GRID_UNIT;
+  const silH = (maxY - minY) * GRID_UNIT;
+  const offX = (w - silW) / 2 - minX * GRID_UNIT;
+  const offY = (Math.min(h, w) - silH) / 2 - minY * GRID_UNIT;
+
+  ctx.fillStyle = 'rgba(44,62,80,0.08)';
+  ctx.strokeStyle = 'rgba(44,62,80,0.15)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  for (const poly of puzzle.silhouette) {
+    ctx.beginPath();
+    for (let i = 0; i < poly.length; i++) {
+      const px = poly[i][0] * GRID_UNIT + offX;
+      const py = poly[i][1] * GRID_UNIT + offY;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  // ピース描画（ヒントピースを先に、選択中を最後に描画）
+  const drawOrder = pieces.map((_, i) => i)
+    .sort((a, b) => {
+      if (a === selectedIdx) return 1;
+      if (b === selectedIdx) return -1;
+      return 0;
+    });
+
+  for (const i of drawOrder) {
+    drawPiece(ctx, pieces[i], i === selectedIdx, offX, offY);
+  }
+}
+
+// ==========================================
+// ピース描画
+// ==========================================
+function drawPiece(ctx, piece, isSelected, offX, offY) {
+  const points = getTransformedPoints(piece);
+  ctx.save();
+
+  ctx.beginPath();
+  for (let i = 0; i < points.length; i++) {
+    const px = points[i][0] * GRID_UNIT + offX;
+    const py = points[i][1] * GRID_UNIT + offY;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  if (piece.isHint) {
+    ctx.fillStyle = piece.colorLight;
+    ctx.globalAlpha = 0.7;
+  } else {
+    ctx.fillStyle = piece.color;
+    ctx.globalAlpha = 0.85;
+  }
+  ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // 枠線
+  ctx.strokeStyle = isSelected ? '#fff' : 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = isSelected ? 3 : 1.5;
+  ctx.stroke();
+
+  // 選択中マーク
+  if (isSelected) {
+    ctx.setLineDash([4, 4]);
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.restore();
+}
+
+// ==========================================
+// ピースの変換（回転・反転）
+// ==========================================
+function getTransformedPoints(piece) {
+  let points = piece.shape.map(v => [...v]);
+
+  // 重心を計算
+  let cx = 0, cy = 0;
+  for (const [px, py] of points) { cx += px; cy += py; }
+  cx /= points.length;
+  cy /= points.length;
+
+  // 反転
+  if (piece.flip) {
+    points = points.map(([px, py]) => [-px + 2 * cx, py]);
+  }
+
+  // 回転（度→ラジアン）
+  const rad = piece.rotation * Math.PI / 180;
+  const cosA = Math.cos(rad);
+  const sinA = Math.sin(rad);
+  points = points.map(([px, py]) => {
+    const dx = px - cx;
+    const dy = py - cy;
+    return [
+      cx + dx * cosA - dy * sinA,
+      cy + dx * sinA + dy * cosA,
+    ];
+  });
+
+  // 移動
+  return points.map(([px, py]) => [px + piece.x, py + piece.y]);
+}
+
+// ==========================================
+// マウス/タッチイベント
+// ==========================================
+function getCanvasPos(e) {
+  const rect = wsCanvas.getBoundingClientRect();
+  const scaleX = wsCanvas.width / rect.width;
+  const scaleY = wsCanvas.height / rect.height;
+  let clientX, clientY;
+  if (e.touches) {
+    clientX = e.touches[0].clientX;
+    clientY = e.touches[0].clientY;
+  } else if (e.changedTouches) {
+    clientX = e.changedTouches[0].clientX;
+    clientY = e.changedTouches[0].clientY;
+  } else {
+    clientX = e.clientX;
+    clientY = e.clientY;
+  }
+  return {
+    x: (clientX - rect.left) * scaleX,
+    y: (clientY - rect.top) * scaleY,
+  };
+}
+
+function getWorkspaceOffset() {
+  const puzzle = PUZZLES[currentPuzzleIdx];
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const poly of puzzle.silhouette) {
+    for (const [px, py] of poly) {
+      minX = Math.min(minX, px);
+      minY = Math.min(minY, py);
+      maxX = Math.max(maxX, px);
+      maxY = Math.max(maxY, py);
+    }
+  }
+  const w = wsCanvas.width;
+  const h = wsCanvas.height;
+  const silW = (maxX - minX) * GRID_UNIT;
+  const silH = (maxY - minY) * GRID_UNIT;
+  return {
+    offX: (w - silW) / 2 - minX * GRID_UNIT,
+    offY: (Math.min(h, w) - silH) / 2 - minY * GRID_UNIT,
+  };
+}
+
+function pixelToUnit(canvasX, canvasY) {
+  const { offX, offY } = getWorkspaceOffset();
+  return {
+    ux: (canvasX - offX) / GRID_UNIT,
+    uy: (canvasY - offY) / GRID_UNIT,
+  };
+}
+
+function hitTestPiece(ux, uy) {
+  // 逆順（上に描画されるものから）でヒットテスト
+  for (let i = pieces.length - 1; i >= 0; i--) {
+    if (pieces[i].isHint) continue;
+    const points = getTransformedPoints(pieces[i]);
+    if (pointInPolygon(ux, uy, points)) return i;
+  }
+  return -1;
+}
+
+function pointInPolygon(px, py, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    if (((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function onMouseDown(e) {
+  if (solved) return;
+  const pos = getCanvasPos(e);
+  const { ux, uy } = pixelToUnit(pos.x, pos.y);
+  const hitIdx = hitTestPiece(ux, uy);
+
+  if (hitIdx >= 0) {
+    selectedIdx = hitIdx;
+    dragging = true;
+    dragOffsetX = ux - pieces[hitIdx].x;
+    dragOffsetY = uy - pieces[hitIdx].y;
+    drawWorkspace();
+  } else {
+    selectedIdx = -1;
+    dragging = false;
+    drawWorkspace();
+  }
+}
+
+function onMouseMove(e) {
+  if (!dragging || selectedIdx < 0) return;
+  const pos = getCanvasPos(e);
+  const { ux, uy } = pixelToUnit(pos.x, pos.y);
+  pieces[selectedIdx].x = ux - dragOffsetX;
+  pieces[selectedIdx].y = uy - dragOffsetY;
+  drawWorkspace();
+}
+
+function onMouseUp(e) {
+  if (dragging && selectedIdx >= 0) {
+    snapToGrid(selectedIdx);
+    drawWorkspace();
+    checkSolved();
+  }
+  dragging = false;
+}
+
+function onTouchStart(e) {
+  e.preventDefault();
+  onMouseDown(e);
+}
+function onTouchMove(e) {
+  e.preventDefault();
+  onMouseMove(e);
+}
+function onTouchEnd(e) {
+  e.preventDefault();
+  if (dragging && selectedIdx >= 0) {
+    snapToGrid(selectedIdx);
+    drawWorkspace();
+    checkSolved();
+  }
+  dragging = false;
+}
+
+// ==========================================
+// スナップ
+// ==========================================
+function snapToGrid(idx) {
+  const p = pieces[idx];
+  // 0.25単位にスナップ
+  p.x = Math.round(p.x * 4) / 4;
+  p.y = Math.round(p.y * 4) / 4;
+}
+
+// ==========================================
+// 回転・反転
+// ==========================================
+function rotatePiece() {
+  if (solved || selectedIdx < 0) return;
+  if (pieces[selectedIdx].isHint) return;
+  pieces[selectedIdx].rotation = (pieces[selectedIdx].rotation + SNAP_ANGLE) % 360;
+  drawWorkspace();
+  checkSolved();
+}
+
+function flipPiece() {
+  if (solved || selectedIdx < 0) return;
+  if (pieces[selectedIdx].isHint) return;
+  pieces[selectedIdx].flip = !pieces[selectedIdx].flip;
+  drawWorkspace();
+  checkSolved();
+}
+
+// ==========================================
+// 正解判定
+// ==========================================
+function checkSolved() {
+  const puzzle = PUZZLES[currentPuzzleIdx];
+  const tolerance = 0.35;  // 許容誤差
+
+  for (let i = 0; i < 7; i++) {
+    const piece = pieces[i];
+    const ans = puzzle.answer[i];
+
+    // 位置チェック
+    const dx = Math.abs(piece.x - ans.x);
+    const dy = Math.abs(piece.y - ans.y);
+    if (dx > tolerance || dy > tolerance) return;
+
+    // 回転チェック（45度単位で正規化）
+    const pRot = ((piece.rotation % 360) + 360) % 360;
+    const aRot = ((ans.rotation % 360) + 360) % 360;
+    if (pRot !== aRot) return;
+
+    // 反転チェック
+    if (piece.flip !== ans.flip) return;
+  }
+
+  onSolved();
+}
+
+function onSolved() {
+  solved = true;
+  const puzzle = PUZZLES[currentPuzzleIdx];
+  totalScore += puzzle.difficulty * 10;
+  document.getElementById('score').textContent = totalScore;
+  showFeedback('⭕ すごい！', '#27ae60');
+  document.getElementById('msg-text').textContent = 'クリア！';
+
+  // 正解色
+  pieces.forEach(p => { p.color = '#27ae60'; });
+  drawWorkspace();
+
+  setTimeout(() => {
+    currentPuzzleIdx++;
+    if (currentPuzzleIdx < PUZZLES.length) {
+      loadPuzzle(currentPuzzleIdx);
+    } else {
+      showComplete();
+    }
+  }, 2500);
+}
+
+// ==========================================
+// フィードバック
+// ==========================================
+function showFeedback(text, color) {
+  const el = document.getElementById('feedback');
+  el.textContent = text;
+  el.style.color = color;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+}
+
+function showComplete() {
+  document.getElementById('puzzle-title').textContent = '🎉 ぜんぶクリア！';
+  document.getElementById('msg-text').textContent = `スコア: ${totalScore}てん おめでとう！`;
+  const ctx = wsCtx;
+  ctx.clearRect(0, 0, wsCanvas.width, wsCanvas.height);
+  ctx.fillStyle = '#333';
+  ctx.font = 'bold 48px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('🏆', wsCanvas.width / 2, wsCanvas.height / 2);
+}
+
+// ==========================================
+// ボタン操作
+// ==========================================
+function resetPuzzle() {
+  if (solved) return;
+  loadPuzzle(currentPuzzleIdx);
+}
+
+function showHint() {
+  if (solved || currentPuzzleIdx >= PUZZLES.length) return;
+  const p = PUZZLES[currentPuzzleIdx];
+  document.getElementById('msg-text').textContent = p.hint || 'よく考えてみよう！';
+  setTimeout(() => {
+    if (!solved) {
+      document.getElementById('msg-text').textContent = 'ピースをドラッグして配置しよう！';
+    }
+  }, 3000);
+}
+
+function showAnswer() {
+  if (solved || currentPuzzleIdx >= PUZZLES.length) return;
+  const puzzle = PUZZLES[currentPuzzleIdx];
+
+  // 全ピースを正解位置に配置
+  for (let i = 0; i < 7; i++) {
+    const ans = puzzle.answer[i];
+    pieces[i].x = ans.x;
+    pieces[i].y = ans.y;
+    pieces[i].rotation = ans.rotation;
+    pieces[i].flip = ans.flip;
+  }
+  pieces.forEach(p => { p.color = '#27ae60'; });
+  drawWorkspace();
+  document.getElementById('msg-text').textContent = 'これが正解だよ！';
+
+  solved = true;
+  setTimeout(() => {
+    currentPuzzleIdx++;
+    if (currentPuzzleIdx < PUZZLES.length) {
+      loadPuzzle(currentPuzzleIdx);
+    } else {
+      showComplete();
+    }
+  }, 2500);
+}
+
+// ==========================================
+// 起動
+// ==========================================
+init();
+</script>
+</body>
+</html>
