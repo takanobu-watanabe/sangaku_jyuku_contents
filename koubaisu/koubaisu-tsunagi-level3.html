@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>公倍数つなぎ</title>
+<link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Rounded Mplus 1c', 'Hiragino Maru Gothic Pro', sans-serif;
+  background: linear-gradient(135deg, #2c3e50, #3498db);
+  min-height: 100vh;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 10px; color: #333;
+  -webkit-tap-highlight-color: transparent; user-select: none;
+}
+
+.panel {
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-radius: 16px; padding: 16px;
+  width: 100%; max-width: 520px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+
+header { text-align: center; margin-bottom: 8px; }
+header h1 { font-size: 1.5em; font-weight: 900; color: #2c3e50; }
+
+.problem-nav {
+  display: flex; align-items: center; justify-content: center;
+  gap: 12px; margin-bottom: 4px;
+}
+.problem-nav button {
+  background: #3498db; color: #fff; border: none; border-radius: 50%;
+  width: 34px; height: 34px; font-size: 1.1em; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.problem-nav button:hover { background: #2980b9; }
+.problem-nav button:disabled { background: #bdc3c7; cursor: default; }
+
+.problem-info { font-size: 1em; font-weight: 700; color: #2c3e50; }
+.difficulty { color: #f39c12; font-size: 1.05em; }
+.description { text-align: center; font-size: 1.05em; font-weight: 700; color: #2c3e50; margin-bottom: 4px; }
+
+.legend {
+  display: flex; justify-content: center; gap: 16px; margin-bottom: 8px; font-size: 0.85em;
+}
+.legend-item { display: flex; align-items: center; gap: 4px; font-weight: 700; }
+.legend-line { width: 24px; height: 4px; border-radius: 2px; }
+.legend-line.c1 { background: #e74c3c; }
+.legend-line.c2 { background: #2980b9; }
+.legend-cross { font-weight: 900; color: #8e44ad; }
+
+.instruction-text { text-align: center; font-size: 0.78em; color: #7f8c8d; margin-bottom: 8px; }
+
+.progress-bar-container { background: #ecf0f1; border-radius: 10px; height: 8px; margin-bottom: 6px; overflow: hidden; }
+.progress-bar { background: linear-gradient(90deg, #2ecc71, #27ae60); height: 100%; width: 0%; border-radius: 10px; transition: width 0.4s ease; }
+.score-display { text-align: center; font-size: 0.8em; color: #7f8c8d; margin-bottom: 8px; }
+
+/* Grid */
+.grid-wrapper { position: relative; margin: 0 auto 10px; width: fit-content; }
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 52px);
+  grid-template-rows: repeat(7, 52px);
+  gap: 0; position: relative; z-index: 1;
+  border: 2px solid #444;
+  background: #ddd;
+}
+
+.cell {
+  width: 52px; height: 52px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.15em; font-weight: 700;
+  border: 1px solid #bbb;
+  background: #fafafa;
+  cursor: default; position: relative;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+
+.cell.has-number { background: #fff; cursor: pointer; color: #2d3436; }
+.cell.has-number:hover { background: #e8f4fd; }
+
+.cell.selected-a {
+  background: #fadbd8 !important; color: #2c3e50;
+  box-shadow: inset 0 0 0 3px #e74c3c;
+}
+.cell.selected-b {
+  background: #d4e6f1 !important; color: #2c3e50;
+  box-shadow: inset 0 0 0 3px #2980b9;
+}
+.cell.selected-both {
+  background: #fef9e7 !important; color: #2c3e50;
+  box-shadow: inset 0 0 0 3px #f1c40f;
+}
+.cell.selected-neutral {
+  background: #f0f0f0 !important; color: #2c3e50;
+  box-shadow: inset 0 0 0 3px #888;
+}
+
+.cell.connected-1 { background: #fadbd8 !important; }
+.cell.connected-2 { background: #d4e6f1 !important; }
+.cell.connected-both { background: #fef9e7 !important; box-shadow: inset 0 0 0 2px #f1c40f; }
+
+/* SVG lines */
+.line-svg {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; z-index: 2;
+}
+
+/* Buttons */
+.buttons { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 8px; }
+.btn {
+  padding: 8px 16px; border: none; border-radius: 10px;
+  font-family: inherit; font-size: 0.9em; font-weight: 700; cursor: pointer;
+}
+.btn:active { transform: scale(0.95); }
+.btn-check { background: #2ecc71; color: #fff; font-size: 1em; }
+.btn-check:hover { background: #27ae60; }
+.btn-reset { background: #e74c3c; color: #fff; }
+.btn-hint { background: #f39c12; color: #fff; }
+.btn-answer { background: #9b59b6; color: #fff; }
+
+.hint-toast {
+  text-align: center; background: #ffeaa7; border-radius: 8px;
+  padding: 8px 12px; margin-bottom: 8px; font-size: 0.85em; display: none;
+}
+.hint-toast.show { display: block; }
+
+
+.success-overlay {
+  display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center;
+}
+.success-overlay.show { display: flex; }
+.success-box {
+  background: #fff; border-radius: 20px; padding: 28px 36px;
+  text-align: center; animation: popIn 0.4s ease;
+}
+.success-box h2 { font-size: 3em; color: #2ecc71; margin-bottom: 12px; }
+.success-box p { font-size: 1em; margin-bottom: 14px; }
+.success-box .lcm-info { font-size: 0.95em; color: #8e44ad; font-weight: 700; margin-bottom: 14px; }
+.success-box button {
+  padding: 10px 24px; border: none; border-radius: 10px;
+  background: #3498db; color: #fff; font-family: inherit; font-size: 1em; font-weight: 700; cursor: pointer;
+}
+
+.error-toast {
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+  background: #e74c3c; color: #fff; padding: 10px 20px; border-radius: 10px;
+  font-family: inherit; font-weight: 700; font-size: 0.9em; z-index: 200;
+  opacity: 0; transition: opacity 0.3s; pointer-events: none;
+}
+.error-toast.show { opacity: 1; }
+
+@keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+.shake { animation: shake 0.3s ease; }
+
+@media (max-width: 420px) {
+  .grid { grid-template-columns: repeat(7, 44px); grid-template-rows: repeat(7, 44px); }
+  .cell { width: 44px; height: 44px; font-size: 1em; }
+  .panel { padding: 12px; }
+  header h1 { font-size: 1.2em; }
+}
+</style>
+</head>
+<body>
+
+<div class="panel">
+  <header>
+    <h1>公倍数つなぎ</h1>
+    <div class="problem-nav">
+      <button id="prevBtn" onclick="prevProblem()">◀</button>
+      <span class="problem-info" id="problemInfo">Q1</span>
+      <span class="difficulty" id="difficultyStars">★</span>
+      <button id="nextBtn" onclick="nextProblem()">▶</button>
+    </div>
+  </header>
+  <div class="description" id="description"></div>
+  <div class="legend" id="legend">
+    <div class="legend-item"><span class="legend-line c1"></span><span id="leg1">3の倍数</span></div>
+    <div class="legend-item"><span class="legend-line c2"></span><span id="leg2">4の倍数</span></div>
+    <div class="legend-item"><span class="legend-cross">✕</span><span>= 公倍数</span></div>
+  </div>
+  <div class="instruction-text">倍数を小さい順に線でつなごう！ 2つの数を選ぶと線がひかれるよ<br>線が交わるところが公倍数！</div>
+
+  <div class="progress-bar-container"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="score-display" id="scoreDisplay">クリア: 0 / 10</div>
+
+  <div class="grid-wrapper" id="gridWrapper">
+    <svg class="line-svg" id="lineSvg"></svg>
+    <div class="grid" id="grid"></div>
+  </div>
+
+  <div class="hint-toast" id="hintToast"></div>
+
+  <div class="buttons">
+    <button class="btn btn-check" onclick="checkAnswer()">チェック</button>
+    <button class="btn btn-reset" onclick="resetPuzzle()">やりなおし</button>
+    <button class="btn btn-hint" onclick="showHint()">ヒント</button>
+    <button class="btn btn-answer" onclick="showAnswer()">こたえ</button>
+  </div>
+</div>
+
+<div class="success-overlay" id="successOverlay">
+  <div class="success-box">
+    <h2>せいかい！</h2>
+    <p id="successMsg"></p>
+    <div class="lcm-info" id="lcmInfo"></div>
+    <button onclick="closeSuccess()">つぎの もんだい</button>
+  </div>
+</div>
+
+<div class="error-toast" id="errorToast"></div>
+
+<script>
+const COLS = 7, ROWS = 7, TOTAL = 49;
+
+// === 事前生成済みパズルデータ（15問・バランス調整済み）===
+const puzzles = [{"id":"Q1","title":"3と4の倍数","bases":[3,4],"difficulty":1,"grid":[0,0,0,4,0,0,0,8,0,0,0,0,0,0,0,16,0,12,0,0,0,21,0,0,0,0,0,0,0,20,24,0,27,0,0,18,0,0,15,6,0,9,0,0,28,0,0,0,3],"chainA":[3,6,9,12,15,18,21,24,27],"chainB":[4,8,12,16,20,24,28],"posA":[48,39,41,17,38,35,21,30,32],"posB":[3,7,17,15,29,30,44],"edgesA":[[48,46,39],[39,41],[41,20,17],[17,38],[38,35],[35,21],[21,23,30],[30,32]],"edgesB":[[3,0,7],[7,10,17],[17,15],[15,29],[29,30],[30,44]],"commonMults":[12,24],"hint":"3の倍数は 3, 6, 9, 12, 15, 18, 21, 24, 27。4の倍数は 4, 8, 12, 16, 20, 24, 28"},{"id":"Q2","title":"4と5の倍数","bases":[4,5],"difficulty":1,"grid":[0,0,0,24,0,0,10,12,0,0,0,0,0,0,0,28,0,20,15,0,5,16,0,0,0,0,0,0,0,32,0,0,0,0,35,4,0,0,0,0,8,0,0,0,25,0,0,0,30],"chainA":[4,8,12,16,20,24,28,32],"chainB":[5,10,15,20,25,30,35],"posA":[35,40,7,21,17,3,15,29],"posB":[20,6,18,17,44,48,34],"edgesA":[[35,40],[40,12,7],[7,21],[21,24,17],[17,3],[3,1,15],[15,29]],"edgesB":[[20,6],[6,4,18],[18,17],[17,16,44],[44,48],[48,34]],"commonMults":[20],"hint":"4の倍数は 4, 8, 12, 16, 20, 24, 28, 32。5の倍数は 5, 10, 15, 20, 25, 30, 35"},{"id":"Q3","title":"3と5の倍数","bases":[3,5],"difficulty":1,"grid":[0,6,0,0,0,0,0,0,0,5,0,0,10,0,0,0,12,0,0,15,0,0,3,0,0,0,0,0,9,0,0,25,0,20,0,0,0,27,0,0,0,0,24,0,21,0,0,0,18],"chainA":[3,6,9,12,15,18,21,24,27],"chainB":[5,10,15,20,25],"posA":[22,1,28,16,19,48,44,42,37],"posB":[9,12,19,33,31],"edgesA":[[22,1],[1,0,28],[28,30,16],[16,19],[19,20,48],[48,44],[44,42],[42,35,37]],"edgesB":[[9,12],[12,19],[19,33],[33,31]],"commonMults":[15],"hint":"3の倍数は 3, 6, 9, 12, 15, 18, 21, 24, 27。5の倍数は 5, 10, 15, 20, 25"},{"id":"Q4","title":"3と7の倍数","bases":[3,7],"difficulty":1,"grid":[0,0,12,0,0,0,28,0,0,0,0,27,0,0,0,24,9,0,0,6,35,0,0,0,21,0,0,14,0,3,0,0,0,0,0,15,0,0,18,0,0,0,0,0,30,0,0,0,7],"chainA":[3,6,9,12,15,18,21,24,27,30],"chainB":[7,14,21,28,35],"posA":[29,19,16,2,35,38,24,15,11,44],"posB":[48,27,24,6,20],"edgesA":[[29,33,19],[19,16],[16,2],[2,0,35],[35,38],[38,24],[24,22,15],[15,8,11],[11,46,44]],"edgesB":[[48,27],[27,24],[24,3,6],[6,20]],"commonMults":[21],"hint":"3の倍数は 3, 6, 9, 12, 15, 18, 21, 24, 27, 30。7の倍数は 7, 14, 21, 28, 35"},{"id":"Q5","title":"4と7の倍数","bases":[4,7],"difficulty":3,"grid":[7,0,8,0,0,0,49,16,0,0,0,0,12,0,0,0,4,0,21,0,42,0,0,0,0,0,20,0,0,0,0,28,0,0,35,32,14,0,0,0,0,0,0,0,0,0,0,24,0],"chainA":[4,8,12,16,20,24,28,32],"chainB":[7,14,21,28,35,42,49],"posA":[16,2,12,7,26,47,31,35],"posB":[0,36,18,31,34,20,6],"edgesA":[[16,2],[2,5,12],[12,7],[7,21,26],[26,47],[47,45,31],[31,28,35]],"edgesB":[[0,1,36],[36,39,18],[18,17,31],[31,34],[34,20],[20,6]],"commonMults":[28],"hint":"4の倍数は 4, 8, 12, 16, 20, 24, 28, 32。7の倍数は 7, 14, 21, 28, 35, 42, 49"},{"id":"Q6","title":"5と6の倍数","bases":[5,6],"difficulty":3,"grid":[35,0,0,0,0,0,0,0,12,0,0,0,42,0,0,0,0,0,18,0,0,6,0,0,0,15,36,0,25,0,30,0,0,0,0,0,0,0,24,0,10,48,0,20,0,5,0,0,0],"chainA":[5,10,15,20,25,30,35],"chainB":[6,12,18,24,30,36,42,48],"posA":[45,40,25,43,28,30,0],"posB":[21,8,18,38,30,26,12,41],"edgesA":[[45,47,40],[40,39,25],[25,22,43],[43,42,28],[28,30],[30,2,0]],"edgesB":[[21,22,8],[8,11,18],[18,17,38],[38,37,30],[30,33,26],[26,12],[12,13,41]],"commonMults":[30],"hint":"5の倍数は 5, 10, 15, 20, 25, 30, 35。6の倍数は 6, 12, 18, 24, 30, 36, 42, 48"},{"id":"Q7","title":"5と7の倍数","bases":[5,7],"difficulty":3,"grid":[49,0,21,0,0,0,0,14,0,0,0,0,40,0,0,42,0,35,28,15,0,0,7,0,0,5,0,0,25,0,0,0,0,0,20,0,0,10,0,0,0,0,0,0,30,0,0,0,0],"chainA":[5,10,15,20,25,30,35,40],"chainB":[7,14,21,28,35,42,49],"posA":[25,37,19,34,28,44,17,12],"posB":[22,7,2,18,17,15,0],"edgesA":[[25,23,37],[37,40,19],[19,20,34],[34,28],[28,42,44],[44,45,17],[17,10,12]],"edgesB":[[22,21,7],[7,9,2],[2,4,18],[18,17],[17,15],[15,1,0]],"commonMults":[35],"hint":"5の倍数は 5, 10, 15, 20, 25, 30, 35, 40。7の倍数は 7, 14, 21, 28, 35, 42, 49"},{"id":"Q8","title":"5と8の倍数","bases":[5,8],"difficulty":3,"grid":[0,0,0,20,0,0,0,0,32,0,0,0,48,0,0,0,0,8,0,0,0,0,0,35,0,40,0,25,0,24,0,16,0,0,45,0,0,0,0,0,30,0,15,0,0,10,0,0,5],"chainA":[5,10,15,20,25,30,35,40,45],"chainB":[8,16,24,32,40,48],"posA":[48,45,42,3,27,40,23,25,34],"posB":[17,31,29,8,25,12],"edgesA":[[48,45],[45,42],[42,0,3],[3,6,27],[27,26,40],[40,37,23],[23,25],[25,32,34]],"edgesB":[[17,31],[31,29],[29,8],[8,11,25],[25,26,12]],"commonMults":[40],"hint":"5の倍数は 5, 10, 15, 20, 25, 30, 35, 40, 45。8の倍数は 8, 16, 24, 32, 40, 48"},{"id":"Q9","title":"6と8の倍数","bases":[6,8],"difficulty":5,"grid":[0,0,32,0,0,0,0,54,0,0,0,0,0,0,0,42,0,48,0,0,40,18,0,24,0,0,0,56,0,36,16,0,8,0,6,0,0,0,30,0,0,0,0,0,0,0,0,0,12],"chainA":[6,12,18,24,30,36,42,48,54],"chainB":[8,16,24,32,40,48,56],"posA":[34,48,21,23,38,29,15,17,7],"posB":[32,30,23,2,20,17,27],"edgesA":[[34,48],[48,42,21],[21,23],[23,24,38],[38,36,29],[29,15],[15,17],[17,10,7]],"edgesB":[[32,30],[30,23],[23,2],[2,6,20],[20,17],[17,24,27]],"commonMults":[24,48],"hint":"6の倍数は 6, 12, 18, 24, 30, 36, 42, 48, 54。8の倍数は 8, 16, 24, 32, 40, 48, 56"},{"id":"Q10","title":"8と10の倍数","bases":[8,10],"difficulty":5,"grid":[0,0,0,50,20,0,10,24,0,0,0,0,0,64,0,0,0,40,30,0,0,0,48,0,0,0,32,0,0,0,60,56,0,0,0,0,0,0,0,0,0,16,0,0,70,8,0,0,0],"chainA":[8,16,24,32,40,48,56,64],"chainB":[10,20,30,40,50,60,70],"posA":[45,41,7,26,17,22,31,13],"posB":[6,4,18,17,3,30,44],"edgesA":[[45,48,41],[41,35,7],[7,12,26],[26,24,17],[17,15,22],[22,24,31],[31,34,13]],"edgesB":[[6,4],[4,18],[18,17],[17,3],[3,2,30],[30,44]],"commonMults":[40],"hint":"8の倍数は 8, 16, 24, 32, 40, 48, 56, 64。10の倍数は 10, 20, 30, 40, 50, 60, 70"}];
+
+function idx2rc(i) { return [Math.floor(i / COLS), i % COLS]; }
+function rc2idx(r, c) { return r * COLS + c; }
+
+// ============================================================
+// ゲーム状態
+// ============================================================
+let currentPuzzleIdx = 0;
+let selectedCell = -1;
+// drawnEdgesA[i] = true → chainAのi番目のエッジが引かれた
+let drawnEdgesA = [];
+let drawnEdgesB = [];
+let solvedSet = new Set();
+let answerAnimating = false;
+
+try { const s = localStorage.getItem('koubaisu_v9'); if (s) solvedSet = new Set(JSON.parse(s)); } catch(e) {}
+function saveSolved() { try { localStorage.setItem('koubaisu_v9', JSON.stringify([...solvedSet])); } catch(e) {} }
+
+// ============================================================
+// UI
+// ============================================================
+
+function getCellCenter(idx) {
+  const gridEl = document.getElementById('grid');
+  const cell = gridEl.children[idx];
+  if (!cell) return { x: 0, y: 0 };
+  const wrapper = document.getElementById('gridWrapper');
+  const wRect = wrapper.getBoundingClientRect();
+  const cRect = cell.getBoundingClientRect();
+  return { x: cRect.left + cRect.width / 2 - wRect.left, y: cRect.top + cRect.height / 2 - wRect.top };
+}
+
+function drawSvgLine(svg, x1, y1, x2, y2, color) {
+  const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', '3');
+  line.setAttribute('stroke-linecap', 'round');
+  line.setAttribute('stroke-linejoin', 'round');
+  line.setAttribute('opacity', '0.4');
+  svg.appendChild(line);
+}
+
+function drawEdge(svg, edge, color) {
+  // edge = [start, end] (straight) or [start, bend, end] (L-shaped)
+  if (edge.length === 2) {
+    const p1 = getCellCenter(edge[0]), p2 = getCellCenter(edge[1]);
+    drawSvgLine(svg, p1.x, p1.y, p2.x, p2.y, color);
+  } else {
+    const p1 = getCellCenter(edge[0]), pb = getCellCenter(edge[1]), p2 = getCellCenter(edge[2]);
+    drawSvgLine(svg, p1.x, p1.y, pb.x, pb.y, color);
+    drawSvgLine(svg, pb.x, pb.y, p2.x, p2.y, color);
+  }
+}
+
+function drawLines() {
+  const svg = document.getElementById('lineSvg');
+  svg.innerHTML = '';
+  requestAnimationFrame(() => {
+    svg.innerHTML = '';
+    const wrapper = document.getElementById('gridWrapper');
+    svg.setAttribute('width', wrapper.offsetWidth);
+    svg.setAttribute('height', wrapper.offsetHeight);
+    svg.style.width = wrapper.offsetWidth + 'px';
+    svg.style.height = wrapper.offsetHeight + 'px';
+
+    const p = puzzles[currentPuzzleIdx];
+
+    // chainAの線（赤）
+    for (let i = 0; i < p.edgesA.length; i++) {
+      if (!drawnEdgesA[i]) continue;
+      drawEdge(svg, p.edgesA[i], '#e74c3c');
+    }
+    // chainBの線（青）
+    for (let i = 0; i < p.edgesB.length; i++) {
+      if (!drawnEdgesB[i]) continue;
+      drawEdge(svg, p.edgesB[i], '#2980b9');
+    }
+  });
+}
+
+function updateCells() {
+  const p = puzzles[currentPuzzleIdx];
+  const gridEl = document.getElementById('grid');
+
+  // 線で繋がれたセルを集める
+  const connA = new Set(), connB = new Set();
+  for (let i = 0; i < p.edgesA.length; i++) {
+    if (drawnEdgesA[i]) { const e=p.edgesA[i]; connA.add(e[0]); connA.add(e[e.length-1]); }
+  }
+  for (let i = 0; i < p.edgesB.length; i++) {
+    if (drawnEdgesB[i]) { const e=p.edgesB[i]; connB.add(e[0]); connB.add(e[e.length-1]); }
+  }
+
+  for (let i = 0; i < TOTAL; i++) {
+    const cell = gridEl.children[i];
+    const val = p.grid[i];
+    cell.className = 'cell';
+    if (val === 0) {
+      cell.textContent = '';
+    } else {
+      cell.classList.add('has-number');
+      cell.textContent = val;
+      if (i === selectedCell) {
+        const sv = p.grid[i];
+        const isA = sv % p.bases[0] === 0;
+        const isB = sv % p.bases[1] === 0;
+        if (isA && isB) cell.classList.add('selected-both');
+        else if (isA) cell.classList.add('selected-a');
+        else if (isB) cell.classList.add('selected-b');
+        else cell.classList.add('selected-neutral');
+      }
+      const inA = connA.has(i), inB = connB.has(i);
+      if (inA && inB) cell.classList.add('connected-both');
+      else if (inA) cell.classList.add('connected-1');
+      else if (inB) cell.classList.add('connected-2');
+    }
+  }
+  drawLines();
+}
+
+function loadPuzzle() {
+  const p = puzzles[currentPuzzleIdx];
+  answerAnimating = false; selectedCell = -1;
+  drawnEdgesA = new Array(p.edgesA.length).fill(false);
+  drawnEdgesB = new Array(p.edgesB.length).fill(false);
+
+  document.getElementById('problemInfo').textContent = `${p.id} - ${p.title}`;
+  document.getElementById('difficultyStars').textContent = '★'.repeat(p.difficulty);
+  document.getElementById('description').textContent = `${p.bases[0]} と ${p.bases[1]} の倍数をそれぞれつなごう！`;
+  document.getElementById('leg1').textContent = `${p.bases[0]}の倍数`;
+  document.getElementById('leg2').textContent = `${p.bases[1]}の倍数`;
+  document.getElementById('prevBtn').disabled = currentPuzzleIdx === 0;
+  document.getElementById('nextBtn').disabled = currentPuzzleIdx === puzzles.length - 1;
+  document.getElementById('hintToast').classList.remove('show');
+
+  const gridEl = document.getElementById('grid');
+  gridEl.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const cell = document.createElement('div');
+    cell.dataset.idx = i;
+    cell.addEventListener('click', () => onCellClick(i));
+    cell.addEventListener('touchend', (e) => { e.preventDefault(); onCellClick(i); });
+    gridEl.appendChild(cell);
+  }
+
+  updateCells(); updateProgress();
+}
+
+function showError(msg) {
+  const toast = document.getElementById('errorToast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+function onCellClick(idx) {
+  if (answerAnimating) return;
+  const p = puzzles[currentPuzzleIdx];
+  const val = p.grid[idx];
+
+  if (val === 0) return;
+
+  // まだ選択なし
+  if (selectedCell === -1) {
+    selectedCell = idx;
+    updateCells();
+    return;
+  }
+
+  // 同じセル再クリック → 選択解除
+  if (selectedCell === idx) {
+    selectedCell = -1;
+    updateCells();
+    return;
+  }
+
+  const valA = p.grid[selectedCell];
+  const valB = val;
+  const small = Math.min(valA, valB);
+  const large = Math.max(valA, valB);
+  const smallIdx = valA < valB ? selectedCell : idx;
+  const largeIdx = valA < valB ? idx : selectedCell;
+
+  // チェインAでの連続ペアか確認
+  let matched = false;
+  for (let i = 0; i < p.edgesA.length; i++) {
+    const e = p.edgesA[i];
+    const ea = e[0], eb = e[e.length - 1];
+    if (p.grid[ea] === small && p.grid[eb] === large && ea === smallIdx && eb === largeIdx) {
+      if (drawnEdgesA[i]) {
+        drawnEdgesA[i] = false;
+      } else {
+        drawnEdgesA[i] = true;
+      }
+      matched = true;
+      break;
+    }
+  }
+
+  // チェインBでの連続ペアか確認
+  for (let i = 0; i < p.edgesB.length; i++) {
+    const e = p.edgesB[i];
+    const ea = e[0], eb = e[e.length - 1];
+    if (p.grid[ea] === small && p.grid[eb] === large && ea === smallIdx && eb === largeIdx) {
+      if (drawnEdgesB[i]) {
+        drawnEdgesB[i] = false;
+      } else {
+        drawnEdgesB[i] = true;
+      }
+      matched = true;
+      break;
+    }
+  }
+
+  if (matched) {
+    selectedCell = idx; // 成功時は2つ目を次の選択として維持
+  } else {
+    selectedCell = idx; // 不一致時は単に選択を移動（エラー表示なし）
+  }
+
+  updateCells();
+}
+
+function shakeCell(idx) {
+  const gridEl = document.getElementById('grid');
+  const cell = gridEl.children[idx];
+  cell.classList.add('shake');
+  setTimeout(() => cell.classList.remove('shake'), 300);
+}
+
+function checkAnswer() {
+  const p = puzzles[currentPuzzleIdx];
+  const allA = drawnEdgesA.every(v => v);
+  const allB = drawnEdgesB.every(v => v);
+  if (allA && allB) {
+    solvedSet.add(currentPuzzleIdx);
+    saveSolved();
+    updateProgress();
+    showSuccessPopup();
+  } else {
+    showError('まだ全部つながっていないよ');
+  }
+}
+
+function showSuccessPopup() {
+  const p = puzzles[currentPuzzleIdx];
+  document.getElementById('successMsg').textContent = `${p.title} をクリアしたよ！`;
+  const cm = p.commonMults;
+  if (cm.length > 0) {
+    document.getElementById('lcmInfo').textContent =
+      `公倍数: ${cm.join(', ')}（${p.bases[0]}と${p.bases[1]}の両方の倍数）`;
+  } else {
+    document.getElementById('lcmInfo').textContent = '';
+  }
+  document.getElementById('successOverlay').classList.add('show');
+}
+
+function closeSuccess() {
+  document.getElementById('successOverlay').classList.remove('show');
+  if (currentPuzzleIdx < puzzles.length - 1) { currentPuzzleIdx++; loadPuzzle(); }
+}
+
+function resetPuzzle() {
+  answerAnimating = false; selectedCell = -1;
+  const p = puzzles[currentPuzzleIdx];
+  drawnEdgesA = new Array(p.edgesA.length).fill(false);
+  drawnEdgesB = new Array(p.edgesB.length).fill(false);
+  document.getElementById('hintToast').classList.remove('show');
+  updateCells();
+}
+
+function showHint() {
+  const p = puzzles[currentPuzzleIdx];
+  const toast = document.getElementById('hintToast');
+  toast.textContent = p.hint;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 6000);
+}
+
+function showAnswer() {
+  const p = puzzles[currentPuzzleIdx];
+  answerAnimating = true; selectedCell = -1;
+  drawnEdgesA = new Array(p.edgesA.length).fill(false);
+  drawnEdgesB = new Array(p.edgesB.length).fill(false);
+  updateCells();
+
+  const totalEdges = p.edgesA.length + p.edgesB.length;
+  let step = 0;
+  const interval = setInterval(() => {
+    if (step >= totalEdges) { clearInterval(interval); answerAnimating = false; return; }
+    // 交互に表示
+    if (step < p.edgesA.length) {
+      drawnEdgesA[step] = true;
+    } else {
+      drawnEdgesB[step - p.edgesA.length] = true;
+    }
+    updateCells();
+    step++;
+  }, 300);
+}
+
+function prevProblem() { if (currentPuzzleIdx > 0) { currentPuzzleIdx--; loadPuzzle(); } }
+function nextProblem() { if (currentPuzzleIdx < puzzles.length - 1) { currentPuzzleIdx++; loadPuzzle(); } }
+
+function updateProgress() {
+  const pct = (solvedSet.size / puzzles.length * 100).toFixed(0);
+  document.getElementById('progressBar').style.width = pct + '%';
+  document.getElementById('scoreDisplay').textContent = `クリア: ${solvedSet.size} / ${puzzles.length}`;
+}
+
+loadPuzzle();
+</script>
+</body>
+</html>

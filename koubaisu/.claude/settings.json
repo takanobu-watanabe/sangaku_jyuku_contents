@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//Users/watanabetakanobu/sangaku_contents/mahoujin/mahoujin-math/**)",
+      "Read(//private/tmp/**)",
+      "Read(//tmp/**)"
+    ]
+  }
+}
