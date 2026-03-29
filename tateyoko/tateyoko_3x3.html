@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>たてよこ算 (3×3)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Sans', sans-serif;
+            background: #f0f4f8;
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 28px;
+        }
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .instructions {
+            max-width: 600px;
+            margin: 0 auto 20px;
+            background: #e8f4fd;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid #3498db;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .nav {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .nav button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            margin: 0 5px;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .nav button:hover { background: #2980b9; }
+        .nav button:disabled { background: #bdc3c7; cursor: default; }
+        .nav .problem-counter {
+            display: inline-block;
+            margin: 0 15px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c3e50;
+            vertical-align: middle;
+        }
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        .grid-container {
+            display: inline-block;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        table {
+            border-collapse: collapse;
+        }
+        td {
+            width: 64px;
+            height: 64px;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 22px;
+            font-weight: bold;
+            border: 2px solid #ddd;
+        }
+        td.operator {
+            background: #3498db;
+            color: white;
+            font-size: 26px;
+            border-color: #3498db;
+        }
+        td.target-col, td.target-row {
+            background: #eaf2f8;
+            color: #2c3e50;
+            border-color: #bdd5ea;
+        }
+        td.cell {
+            background: white;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        td.cell:hover {
+            background: #ebf5fb;
+            border-color: #3498db;
+        }
+        td.cell.selected {
+            background: #d4effd;
+            border-color: #3498db;
+            box-shadow: inset 0 0 0 2px #3498db;
+        }
+        td.black-cell {
+            background: #2c3e50;
+            border-color: #2c3e50;
+            cursor: default;
+        }
+        .number-pad {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 350px;
+        }
+        .number-pad button {
+            width: 50px;
+            height: 50px;
+            font-size: 20px;
+            font-weight: bold;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .number-pad button:hover {
+            background: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        .number-pad button.clear-btn {
+            width: 70px;
+            background: #e74c3c;
+            color: white;
+            border-color: #e74c3c;
+        }
+        .number-pad button.clear-btn:hover {
+            background: #c0392b;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .controls button {
+            padding: 10px 24px;
+            font-size: 15px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+            transition: background 0.2s;
+        }
+        .btn-check { background: #27ae60; }
+        .btn-check:hover { background: #219a52; }
+        .btn-reset { background: #e74c3c; }
+        .btn-reset:hover { background: #c0392b; }
+        .btn-hint { background: #f39c12; }
+        .btn-hint:hover { background: #e67e22; }
+        .btn-answer { background: #8e44ad; }
+        .btn-answer:hover { background: #7d3c98; }
+        .feedback {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            min-height: 30px;
+            margin-top: 10px;
+        }
+        .feedback.success { color: #27ae60; }
+        .feedback.error { color: #e74c3c; }
+        .feedback.hint { color: #f39c12; }
+        td.cell.answer { background: #d5f5e3; color: #27ae60; }
+        .success-banner {
+            display: none; text-align: center; font-size: 36px; font-weight: bold;
+            color: #27ae60; padding: 16px; margin-bottom: 10px;
+            animation: popIn 0.5s ease;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <h1>たてよこ算 (3×3)</h1>
+    <div class="subtitle" id="problem-type"></div>
+    <div class="instructions">
+        <strong>＜ルール＞</strong><br>
+        タテに足す（かける）と上の数字に、ヨコに足す（かける）と左の数字になるように、数字を入れましょう。
+    </div>
+
+    <div class="nav">
+        <button id="prev-btn" onclick="prevProblem()">◀ 前へ</button>
+        <span class="problem-counter" id="counter">1 / 1</span>
+        <button id="next-btn" onclick="nextProblem()">次へ ▶</button>
+    </div>
+
+    <div class="game-area">
+        <div class="success-banner" id="success-banner">🎉 せいかいです！おめでとう！</div>
+        <div class="grid-container">
+            <table id="grid-table"></table>
+        </div>
+        <div class="number-pad" id="number-pad"></div>
+        <div class="controls">
+            <button class="btn-check" onclick="checkAnswer()">チェック</button>
+            <button class="btn-reset" onclick="resetProblem()">リセット</button>
+            <button class="btn-hint" onclick="showHint()">ヒント</button>
+            <button class="btn-answer" onclick="showAnswer()">こたえ</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+    </div>
+
+    <script>
+    const problems = [{"type": "addition", "size": 3, "grid": [[2, 1, 6], [3, 9, 5], [8, 7, 4]], "row_targets": [7, 17, 15], "col_targets": [11, 17, 11], "black_cells": [[0, 0], [2, 2]]}, {"type": "addition", "size": 3, "grid": [[2, 4, 9], [5, 6, 1], [3, 8, 7]], "row_targets": [15, 12, 10], "col_targets": [10, 10, 17], "black_cells": [[2, 1]]}, {"type": "addition", "size": 3, "grid": [[5, 1, 7], [2, 4, 3], [6, 8, 9]], "row_targets": [12, 9, 14], "col_targets": [13, 12, 10], "black_cells": [[0, 1], [2, 2]]}, {"type": "addition", "size": 3, "grid": [[7, 2, 3], [9, 5, 6], [1, 8, 4]], "row_targets": [10, 15, 13], "col_targets": [17, 8, 13], "black_cells": [[0, 1], [1, 1]]}, {"type": "addition", "size": 3, "grid": [[6, 4, 9], [1, 7, 2], [8, 5, 3]], "row_targets": [19, 10, 8], "col_targets": [7, 16, 14], "black_cells": [[2, 0]]}, {"type": "addition", "size": 3, "grid": [[5, 8, 6], [3, 2, 7], [9, 1, 4]], "row_targets": [13, 12, 14], "col_targets": [17, 11, 11], "black_cells": [[0, 2]]}, {"type": "addition", "size": 3, "grid": [[9, 4, 2], [8, 6, 3], [5, 1, 7]], "row_targets": [15, 9, 13], "col_targets": [14, 11, 12], "black_cells": [[1, 0]]}, {"type": "addition", "size": 3, "grid": [[1, 6, 4], [3, 9, 2], [8, 7, 5]], "row_targets": [11, 14, 5], "col_targets": [4, 15, 11], "black_cells": [[2, 0], [2, 1]]}, {"type": "addition", "size": 3, "grid": [[3, 5, 2], [7, 8, 9], [4, 6, 1]], "row_targets": [8, 17, 11], "col_targets": [7, 19, 10], "black_cells": [[1, 0], [0, 2]]}, {"type": "addition", "size": 3, "grid": [[9, 8, 1], [7, 6, 2], [3, 5, 4]], "row_targets": [18, 15, 9], "col_targets": [16, 19, 7], "black_cells": [[2, 0]]}, {"type": "multiplication", "size": 3, "grid": [[7, 8, 5], [3, 9, 1], [6, 4, 2]], "row_targets": [35, 3, 48], "col_targets": [126, 4, 10], "black_cells": [[0, 1], [1, 1]]}, {"type": "multiplication", "size": 3, "grid": [[7, 3, 4], [1, 8, 2], [5, 6, 9]], "row_targets": [21, 16, 270], "col_targets": [35, 144, 18], "black_cells": [[0, 2]]}, {"type": "multiplication", "size": 3, "grid": [[6, 3, 5], [7, 1, 8], [2, 9, 4]], "row_targets": [90, 8, 72], "col_targets": [12, 27, 160], "black_cells": [[1, 1], [1, 0]]}, {"type": "multiplication", "size": 3, "grid": [[1, 4, 5], [9, 6, 8], [7, 3, 2]], "row_targets": [4, 432, 21], "col_targets": [63, 72, 8], "black_cells": [[2, 2], [0, 2]]}, {"type": "multiplication", "size": 3, "grid": [[5, 7, 2], [9, 8, 3], [6, 4, 1]], "row_targets": [10, 24, 24], "col_targets": [30, 32, 6], "black_cells": [[0, 1], [1, 0]]}, {"type": "multiplication", "size": 3, "grid": [[4, 2, 3], [1, 5, 8], [7, 6, 9]], "row_targets": [6, 40, 378], "col_targets": [7, 60, 216], "black_cells": [[0, 0]]}, {"type": "multiplication", "size": 3, "grid": [[4, 2, 1], [3, 7, 8], [9, 6, 5]], "row_targets": [8, 168, 45], "col_targets": [108, 14, 40], "black_cells": [[2, 1]]}, {"type": "multiplication", "size": 3, "grid": [[4, 8, 7], [9, 2, 1], [6, 5, 3]], "row_targets": [224, 18, 3], "col_targets": [36, 16, 21], "black_cells": [[2, 0], [2, 1]]}, {"type": "multiplication", "size": 3, "grid": [[1, 2, 9], [4, 3, 7], [6, 5, 8]], "row_targets": [2, 84, 40], "col_targets": [4, 30, 56], "black_cells": [[0, 2], [2, 0]]}, {"type": "multiplication", "size": 3, "grid": [[3, 5, 4], [2, 1, 7], [9, 8, 6]], "row_targets": [12, 14, 432], "col_targets": [54, 8, 168], "black_cells": [[0, 1]]}];
+    let currentIndex = 0;
+    let selectedCell = null;
+    let userAnswers = {};
+
+    function init() {
+        buildNumberPad();
+        loadProblem(0);
+    }
+
+    function buildNumberPad() {
+        const pad = document.getElementById('number-pad');
+        pad.innerHTML = '';
+        for (let n = 1; n <= 9; n++) {
+            const btn = document.createElement('button');
+            btn.textContent = n;
+            btn.onclick = () => inputNumber(n);
+            pad.appendChild(btn);
+        }
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = '消す';
+        clearBtn.className = 'clear-btn';
+        clearBtn.onclick = () => inputNumber(0);
+        pad.appendChild(clearBtn);
+    }
+
+    function loadProblem(index) {
+        currentIndex = index;
+        selectedCell = null;
+        const p = problems[index];
+        const size = p.size;
+        const op = p.type === 'addition' ? '+' : '×';
+        const blackCells = (p.black_cells || []).map(bc => bc[0] + ',' + bc[1]);
+
+        if (!userAnswers[index]) {
+            userAnswers[index] = {};
+        }
+
+        document.getElementById('counter').textContent = (index + 1) + ' / ' + problems.length;
+        document.getElementById('prev-btn').disabled = index === 0;
+        document.getElementById('next-btn').disabled = index === problems.length - 1;
+
+        const typeLabel = p.type === 'addition' ? 'たし算' : 'かけ算';
+        document.getElementById('problem-type').textContent =
+            '第' + (index + 1) + '問 (' + size + '×' + size + ' ' + typeLabel + ')';
+
+        const table = document.getElementById('grid-table');
+        table.innerHTML = '';
+
+        // ヘッダー行（演算子 + 列目標値）
+        const headerRow = document.createElement('tr');
+        const opCell = document.createElement('td');
+        opCell.className = 'operator';
+        opCell.textContent = op;
+        headerRow.appendChild(opCell);
+        for (let j = 0; j < size; j++) {
+            const td = document.createElement('td');
+            td.className = 'target-col';
+            td.id = 'col-target-' + j;
+            td.textContent = p.col_targets[j];
+            headerRow.appendChild(td);
+        }
+        table.appendChild(headerRow);
+
+        // データ行
+        for (let i = 0; i < size; i++) {
+            const tr = document.createElement('tr');
+            const rowTarget = document.createElement('td');
+            rowTarget.className = 'target-row';
+            rowTarget.id = 'row-target-' + i;
+            rowTarget.textContent = p.row_targets[i];
+            tr.appendChild(rowTarget);
+
+            for (let j = 0; j < size; j++) {
+                const td = document.createElement('td');
+                const key = i + ',' + j;
+                if (blackCells.includes(key)) {
+                    td.className = 'black-cell';
+                } else {
+                    td.className = 'cell';
+                    td.dataset.row = i;
+                    td.dataset.col = j;
+                    td.onclick = function() { selectCell(this); };
+                    if (userAnswers[index][key]) {
+                        td.textContent = userAnswers[index][key];
+                    }
+                }
+                tr.appendChild(td);
+            }
+            table.appendChild(tr);
+        }
+
+        document.getElementById('feedback').textContent = '';
+        document.getElementById('feedback').className = 'feedback';
+        document.getElementById('success-banner').style.display = 'none';
+        updatePad();
+        checkComplete();
+    }
+
+    function updatePad() {
+        const used = new Set();
+        document.querySelectorAll('td.cell').forEach(c => {
+            const v = c.textContent.trim();
+            if (v) used.add(parseInt(v));
+        });
+        const btns = document.querySelectorAll('#number-pad button:not(.clear-btn)');
+        btns.forEach(btn => {
+            const n = parseInt(btn.textContent);
+            btn.disabled = used.has(n);
+            btn.style.opacity = used.has(n) ? '0.3' : '1';
+        });
+    }
+
+    function selectCell(td) {
+        if (selectedCell) {
+            selectedCell.classList.remove('selected');
+        }
+        selectedCell = td;
+        td.classList.add('selected');
+    }
+
+    function inputNumber(n) {
+        if (!selectedCell) return;
+        const row = selectedCell.dataset.row;
+        const col = selectedCell.dataset.col;
+        const key = row + ',' + col;
+
+        if (n === 0) {
+            selectedCell.textContent = '';
+            delete userAnswers[currentIndex][key];
+        } else {
+            selectedCell.textContent = n;
+            userAnswers[currentIndex][key] = n;
+        }
+        updatePad();
+        checkComplete();
+    }
+
+    function checkComplete() {
+        const p = problems[currentIndex];
+        const size = p.size;
+        const isAdd = p.type === 'addition';
+        const blackCells = (p.black_cells || []).map(bc => bc[0] + ',' + bc[1]);
+        const userGrid = Array.from({length: size}, () => Array(size).fill(null));
+        document.querySelectorAll('td.cell').forEach(c => {
+            const v = c.textContent.trim();
+            userGrid[parseInt(c.dataset.row)][parseInt(c.dataset.col)] = v ? parseInt(v) : null;
+        });
+        for (let i = 0; i < size; i++)
+            for (let j = 0; j < size; j++)
+                if (!blackCells.includes(i+','+j) && userGrid[i][j] === null) return;
+        for (let i = 0; i < size; i++) {
+            let val = isAdd ? 0 : 1;
+            for (let j = 0; j < size; j++) {
+                if (blackCells.includes(i+','+j)) continue;
+                if (isAdd) val += userGrid[i][j]; else val *= userGrid[i][j];
+            }
+            if (val !== p.row_targets[i]) return;
+        }
+        for (let j = 0; j < size; j++) {
+            let val = isAdd ? 0 : 1;
+            for (let i = 0; i < size; i++) {
+                if (blackCells.includes(i+','+j)) continue;
+                if (isAdd) val += userGrid[i][j]; else val *= userGrid[i][j];
+            }
+            if (val !== p.col_targets[j]) return;
+        }
+        document.getElementById('success-banner').style.display = 'block';
+        setTimeout(() => { if (currentIndex < problems.length - 1) loadProblem(currentIndex + 1); }, 1500);
+    }
+
+    function checkAnswer() {
+        const p = problems[currentIndex];
+        const size = p.size;
+        const isAdd = p.type === 'addition';
+        const blackCells = (p.black_cells || []).map(bc => bc[0] + ',' + bc[1]);
+        const cells = document.querySelectorAll('td.cell');
+        let allFilled = true;
+        cells.forEach(c => { if (!c.textContent) allFilled = false; });
+        if (!allFilled) { showFeedback('すべてのマスに数字を入れてください。', 'error'); return; }
+        const userGrid = Array.from({length: size}, () => Array(size).fill(0));
+        cells.forEach(c => {
+            userGrid[parseInt(c.dataset.row)][parseInt(c.dataset.col)] = parseInt(c.textContent);
+        });
+        let ok = true;
+        for (let i = 0; i < size; i++) {
+            let val = isAdd ? 0 : 1;
+            for (let j = 0; j < size; j++) {
+                if (blackCells.includes(i+','+j)) continue;
+                if (isAdd) val += userGrid[i][j]; else val *= userGrid[i][j];
+            }
+            if (val !== p.row_targets[i]) ok = false;
+        }
+        for (let j = 0; j < size; j++) {
+            let val = isAdd ? 0 : 1;
+            for (let i = 0; i < size; i++) {
+                if (blackCells.includes(i+','+j)) continue;
+                if (isAdd) val += userGrid[i][j]; else val *= userGrid[i][j];
+            }
+            if (val !== p.col_targets[j]) ok = false;
+        }
+        if (ok) {
+            document.getElementById('success-banner').style.display = 'block';
+            setTimeout(() => { if (currentIndex < problems.length - 1) loadProblem(currentIndex + 1); }, 1500);
+        } else {
+            showFeedback('まだ正しくないところがあります。もう一度考えてみましょう。', 'error');
+        }
+    }
+
+    function resetProblem() {
+        userAnswers[currentIndex] = {};
+        loadProblem(currentIndex);
+    }
+
+    function showHint() {
+        const p = problems[currentIndex];
+        const emptyCells = [];
+        document.querySelectorAll('td.cell').forEach(c => {
+            if (!c.textContent) emptyCells.push(c);
+        });
+
+        if (emptyCells.length === 0) {
+            showFeedback('すべてのマスが埋まっています。', 'hint');
+            return;
+        }
+
+        const hintCell = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+        const r = parseInt(hintCell.dataset.row);
+        const col = parseInt(hintCell.dataset.col);
+        hintCell.textContent = p.grid[r][col];
+        userAnswers[currentIndex][r + ',' + col] = p.grid[r][col];
+        showFeedback('ヒント：1つのマスを埋めました。', 'hint');
+        updatePad();
+        checkComplete();
+    }
+
+    function showAnswer() {
+        const p = problems[currentIndex];
+        document.querySelectorAll('td.cell').forEach(c => {
+            const r = parseInt(c.dataset.row);
+            const col = parseInt(c.dataset.col);
+            c.textContent = p.grid[r][col];
+            c.classList.add('answer');
+            userAnswers[currentIndex][r + ',' + col] = p.grid[r][col];
+        });
+        showFeedback('こたえを表示しました。', 'hint');
+    }
+
+    function showFeedback(msg, type) {
+        const fb = document.getElementById('feedback');
+        fb.textContent = msg;
+        fb.className = 'feedback ' + (type || '');
+    }
+
+    function prevProblem() {
+        if (currentIndex > 0) loadProblem(currentIndex - 1);
+    }
+
+    function nextProblem() {
+        if (currentIndex < problems.length - 1) loadProblem(currentIndex + 1);
+    }
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key >= '1' && e.key <= '9') {
+            inputNumber(parseInt(e.key));
+        } else if (e.key === 'Backspace' || e.key === 'Delete') {
+            inputNumber(0);
+        } else if (e.key === 'ArrowLeft') {
+            prevProblem();
+        } else if (e.key === 'ArrowRight') {
+            nextProblem();
+        }
+    });
+
+    init();
+    </script>
+</body>
+</html>
