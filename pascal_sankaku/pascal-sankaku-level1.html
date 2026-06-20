@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>パスカルの三角形 Level 1</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Rounded Mplus 1c', 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+    min-height: 100vh;
+    color: #333;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ヘッダー */
+  #header {
+    width: 100%;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    z-index: 10;
+  }
+  #header h1 { font-size: 1.15rem; color: #2c3e50; }
+  #level-badge {
+    background: #e74c3c; color: white;
+    padding: 4px 14px; border-radius: 20px;
+    font-size: 0.85rem; font-weight: bold;
+  }
+
+  /* セルフチェックバナー（エラー時のみ表示） */
+  #selfcheck {
+    width: 100%; text-align: center; font-size: 0.8rem;
+    padding: 5px 12px; font-weight: bold; cursor: pointer;
+    display: none;
+  }
+  #selfcheck.ng { background: #fadbd8; color: #c0392b; display: block; }
+  #selfcheck-detail {
+    display: none; width: 100%; max-width: 600px;
+    background: rgba(255,255,255,0.95); color: #c0392b;
+    font-size: 0.78rem; text-align: left; padding: 8px 16px;
+    white-space: pre-wrap; border-radius: 0 0 10px 10px;
+  }
+
+  /* メインエリア */
+  #main {
+    flex: 1; display: flex; flex-direction: column; align-items: center;
+    padding: 16px; gap: 14px; width: 100%; max-width: 680px;
+  }
+
+  #puzzle-title {
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+    border-radius: 16px; padding: 10px 24px; text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    font-size: 1.05rem; font-weight: bold; color: #2c3e50;
+  }
+
+  #rule-display {
+    background: rgba(255,255,255,0.88); backdrop-filter: blur(10px);
+    border-radius: 12px; padding: 10px 18px; text-align: center;
+    font-size: 0.92rem; color: #444; box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    line-height: 1.5;
+  }
+
+  #progress-bar {
+    width: 100%; max-width: 420px; height: 8px;
+    background: rgba(255,255,255,0.3); border-radius: 4px; overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%; background: linear-gradient(90deg, #00b894, #55efc4);
+    border-radius: 4px; transition: width 0.5s ease;
+  }
+
+  /* ナビ */
+  #nav { display: flex; align-items: center; gap: 14px; justify-content: center; }
+  .nav-btn {
+    padding: 8px 18px; border: none; border-radius: 20px;
+    background: rgba(255,255,255,0.92); font-size: 0.9rem; font-weight: bold;
+    color: #2c3e50; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: transform 0.15s;
+  }
+  .nav-btn:active { transform: scale(0.94); }
+  .nav-btn:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
+  #nav-count { font-weight: bold; color: #fff; font-size: 0.95rem; min-width: 60px; text-align: center; }
+
+  /* 三角形 */
+  #triangle {
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(10px);
+    border-radius: 16px; padding: 16px 10px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    max-width: 100%; overflow-x: auto;
+  }
+  .tri-row { display: flex; justify-content: center; }
+  .tri-cell {
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 8px; font-weight: bold; margin: 2px;
+    background: linear-gradient(135deg, #ecf0f1, #d6dbdf); color: #2c3e50;
+    transition: transform 0.12s, background 0.12s; flex: 0 0 auto;
+  }
+  .tri-cell.blank {
+    background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+    border: 2px dashed #f39c12; cursor: pointer; color: #b9770e;
+  }
+  .tri-cell.blank.active {
+    background: linear-gradient(135deg, #81ecec, #00cec9);
+    border-color: #00b894; color: #fff; transform: scale(1.12);
+  }
+  .tri-cell.blank.wrong {
+    animation: shake 0.4s ease;
+    background: linear-gradient(135deg,#ff7675,#d63031); color:#fff; border-color:#d63031;
+  }
+  .tri-cell.blank.right {
+    background: linear-gradient(135deg, #55efc4, #00b894); color: #fff; border-color: #00b894;
+  }
+
+  /* 入力パッド */
+  #pad {
+    display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+    background: rgba(255,255,255,0.92); backdrop-filter: blur(10px);
+    border-radius: 16px; padding: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    position: fixed; right: 12px; top: 50%; transform: translateY(-50%);
+    width: 230px; z-index: 50;          /* スクロールしても右側に固定 */
+  }
+  @media (max-width: 600px) {           /* 狭い画面では下に回す */
+    #pad { position: static; transform: none; width: 100%; max-width: 360px; }
+    body { padding-right: 0; }
+  }
+  @media (min-width: 601px) {           /* 広い画面は右に入力パッドぶんの余白 */
+    body { padding-right: 250px; }
+  }
+  .pad-key {
+    padding: 12px 0; border: none; border-radius: 10px;
+    background: linear-gradient(135deg, #74b9ff, #0984e3);
+    color: #fff; font-size: 1.3rem; font-weight: bold;
+    cursor: pointer; transition: transform 0.1s;
+  }
+  .pad-key:active { transform: scale(0.92); }
+  .pad-key.fn { background: linear-gradient(135deg, #b2bec3, #636e72); }
+
+  #controls { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .ctrl-btn {
+    padding: 10px 16px; border: none; border-radius: 12px;
+    background: rgba(255,255,255,0.92); font-size: 0.88rem;
+    cursor: pointer; font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1); transition: transform 0.15s;
+  }
+  .ctrl-btn:active { transform: scale(0.94); }
+  .ctrl-btn.primary { background: #3498db; color: #fff; }
+
+  #instructions {
+    background: rgba(255,255,255,0.85); backdrop-filter: blur(10px);
+    border-radius: 12px; padding: 8px 18px; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 460px;
+  }
+  #instructions .msg { font-size: 0.88rem; color: #333; }
+
+  #score-panel {
+    position: fixed; top: 56px; right: 14px;
+    background: rgba(255,255,255,0.9); border-radius: 14px;
+    padding: 8px 14px; z-index: 10; text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #score-panel .label { font-size: 0.7rem; color: #888; }
+  #score-panel .value { font-size: 1.3rem; font-weight: bold; color: #2c3e50; }
+
+  #feedback {
+    position: fixed; top: 45%; left: 50%; transform: translate(-50%, -50%);
+    font-size: 2.6rem; font-weight: bold; z-index: 100;
+    pointer-events: none; opacity: 0; text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  #feedback.show { opacity: 1; animation: pop 0.9s ease forwards; }
+
+  @keyframes pop {
+    0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+    40% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+    70% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>📐 パスカルの三角形 Lv1</h1>
+  <span id="level-badge">Q1</span>
+</div>
+<div id="selfcheck" onclick="toggleCheckDetail()"></div>
+<div id="selfcheck-detail"></div>
+
+<div id="main">
+  <div id="puzzle-title">—</div>
+  <div id="rule-display">—</div>
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+  <div id="nav">
+    <button class="nav-btn" id="prev-btn" onclick="prevPuzzle()">◀ まえ</button>
+    <span id="nav-count">1 / 10</span>
+    <button class="nav-btn" id="next-btn" onclick="goNext()">つぎ ▶</button>
+  </div>
+
+  <div id="triangle"></div>
+
+  <div id="pad"></div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="resetPuzzle()">🔄 やりなおし</button>
+    <button class="ctrl-btn primary" onclick="judge()">⭕ はんてい</button>
+    <button class="ctrl-btn" onclick="showHint()">💡 ヒント</button>
+    <button class="ctrl-btn" onclick="showAnswer()">👀 こたえ</button>
+  </div>
+
+  <div id="instructions"><div class="msg" id="msg-text">—</div></div>
+</div>
+
+<div id="score-panel">
+  <div class="label">スコア</div>
+  <div class="value" id="score">0</div>
+</div>
+<div id="feedback"></div>
+
+<script>
+// ==========================================================
+// パスカルの三角形パズル（空欄うめ専用エンジン）
+//
+// 問題は下の PUZZLES 配列だけを差し替える。正解はエンジンが
+// 三角形から自動計算するので手書きしない。
+//
+//   各問題オブジェクト:
+//     id        : "Q1" など
+//     difficulty: 1-5（★の数）
+//     title     : 画面に出す見出し
+//     rows      : 三角形の段数
+//     scatter   : 三角形の内側にランダムな虫食いを作る（PDF風・おすすめ）
+//                 {count:6, seed:11, minRow:3, maxRow:10}
+//                 count=空欄マス数 / seed=配置を決める数（変えると配置が変わる） /
+//                 minRow,maxRow=散らす段の範囲。両はしの 1 は対象外。
+//     blankRows : 段をまるごと空欄にする配列（例 [9,10]）（任意）
+//     blanks    : 個別に空欄にするマス [{r,i}]（任意）。r=段(1始まり), i=左から(0始まり)
+//     ※ scatter / blankRows / blanks は併用可。正解はエンジンが自動計算する。
+//     hint      : ヒント文
+//
+//   ※ 空欄以外のマスは数字が表示される。上の見えている段から
+//      「左上＋右上」をたして、空いた段を上から順にうめていく。
+// ==========================================================
+
+const PUZZLES = [
+  // Level 1（★1〜3）小さめの三角形にランダムな虫食い。空欄は2〜6マス。
+  { id:"Q1", difficulty:1, rows:6, title:"虫食いをうめよう①", scatter:{count:2, seed:3, minRow:3, maxRow:6},
+    hint:"数字のない黄色いマスを、すぐ上の左＋右をたしてうめよう。両はしは 1。" },
+  { id:"Q2", difficulty:1, rows:6, title:"虫食いをうめよう②", scatter:{count:3, seed:8, minRow:3, maxRow:6},
+    hint:"数字のない黄色いマスを、すぐ上の左＋右をたしてうめよう。両はしは 1。" },
+  { id:"Q3", difficulty:1, rows:7, title:"虫食いをうめよう③", scatter:{count:3, seed:14, minRow:3, maxRow:7},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q4", difficulty:2, rows:7, title:"虫食いをうめよう④", scatter:{count:4, seed:22, minRow:3, maxRow:7},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q5", difficulty:2, rows:8, title:"虫食いをうめよう⑤", scatter:{count:4, seed:31, minRow:3, maxRow:8},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q6", difficulty:2, rows:8, title:"虫食いをうめよう⑥", scatter:{count:5, seed:45, minRow:3, maxRow:8},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q7", difficulty:2, rows:9, title:"虫食いをうめよう⑦", scatter:{count:5, seed:58, minRow:3, maxRow:9},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q8", difficulty:3, rows:9, title:"虫食いをうめよう⑧", scatter:{count:5, seed:66, minRow:4, maxRow:9},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q9", difficulty:3, rows:10, title:"虫食いをうめよう⑨", scatter:{count:6, seed:79, minRow:4, maxRow:10},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+  { id:"Q10", difficulty:3, rows:10, title:"虫食いをうめよう⑩", scatter:{count:6, seed:91, minRow:4, maxRow:10},
+    hint:"上のほうから順にうめよう。両はしは 1。" },
+];
+
+// ==========================================================
+// パスカルの三角形
+// ==========================================================
+function buildPascal(rows) {
+  const tri = [];
+  for (let r = 0; r < rows; r++) {
+    const row = [];
+    for (let i = 0; i <= r; i++) {
+      if (i === 0 || i === r) row.push(1);
+      else row.push(tri[r-1][i-1] + tri[r-1][i]);
+    }
+    tri.push(row);
+  }
+  return tri;
+}
+function cellValue(tri, r, i) { return tri[r-1][i]; }
+
+// シード付き乱数（決定論的＝seedが同じなら毎回同じ配置になる）
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+// 空欄マスの一覧（scatter / blankRows / blanks を統合）
+function getBlanks(p) {
+  const seen = new Set(), list = [];
+  function add(r, i) { const k = r+","+i; if (!seen.has(k)) { seen.add(k); list.push({r, i}); } }
+  // scatter: 三角形の「内側」マス（両はしの1を除く）からランダムに count 個を空欄に
+  if (p.scatter) {
+    const sc = p.scatter, lo = sc.minRow || 3, hi = sc.maxRow || p.rows;
+    const cand = [];
+    for (let r = lo; r <= hi; r++) for (let i = 1; i <= r-2; i++) cand.push({r, i});
+    const rnd = mulberry32(sc.seed || 1);
+    for (let k = cand.length-1; k > 0; k--) { const j = Math.floor(rnd()*(k+1)); const t=cand[k]; cand[k]=cand[j]; cand[j]=t; }
+    cand.slice(0, sc.count).forEach(c => add(c.r, c.i));
+  }
+  (p.blankRows||[]).forEach(r => { for (let i = 0; i < r; i++) add(r, i); });
+  (p.blanks||[]).forEach(b => add(b.r, b.i));
+  return list;
+}
+
+// ==========================================================
+// セルフチェック（必ず実行）：座標の正しさ＋重複検出
+// 正常時はバナーを出さない。問題があるときだけ赤バナー＋コンソール。
+// ==========================================================
+function validatePuzzles() {
+  const errors = [], warnings = [], sigs = new Map();
+  PUZZLES.forEach((p, idx) => {
+    const tag = `[${idx+1}] ${p.id||"?"}`;
+    if (!p.title) warnings.push(`${tag}: title がありません`);
+    if (!p.hint) warnings.push(`${tag}: hint がありません`);
+    if (!(p.rows >= 2)) errors.push(`${tag}: rows が不正`);
+    if (p.scatter) {
+      const sc = p.scatter, lo = sc.minRow || 3, hi = sc.maxRow || p.rows;
+      let cc = 0; for (let r = lo; r <= hi; r++) cc += Math.max(0, r-2);
+      if (!(sc.count >= 1)) errors.push(`${tag}: scatter.count が不正`);
+      if (lo < 3 || hi > p.rows || lo > hi) errors.push(`${tag}: scatter の段の範囲が不正`);
+      if (sc.count > cc) errors.push(`${tag}: scatter.count(${sc.count}) が内側マス数(${cc})を超える`);
+    }
+    (p.blankRows||[]).forEach(r => {
+      if (r < 1 || r > p.rows) errors.push(`${tag}: blankRows ${r} が段の外`);
+    });
+    (p.blanks||[]).forEach(b => {
+      if (b.r < 1 || b.r > p.rows || b.i < 0 || b.i >= b.r)
+        errors.push(`${tag}: 空欄 {r:${b.r},i:${b.i}} が三角形の外`);
+    });
+    if (getBlanks(p).length === 0) errors.push(`${tag}: 空欄が1つもありません`);
+
+    const sig = p.rows + "|R" + JSON.stringify(p.blankRows||[]) + "|B" + JSON.stringify(p.blanks||[]) + "|S" + JSON.stringify(p.scatter||{});
+    if (sigs.has(sig)) warnings.push(`${tag}: 問題 ${sigs.get(sig)} とほぼ同じ内容（空欄の段を変えて）`);
+    else sigs.set(sig, p.id||tag);
+  });
+  return { errors, warnings, total: PUZZLES.length };
+}
+
+function renderSelfCheck() {
+  const res = validatePuzzles();
+  const banner = document.getElementById("selfcheck");
+  const detail = document.getElementById("selfcheck-detail");
+  const lines = [];
+  if (res.errors.length) lines.push("■ エラー（要修正）", ...res.errors);
+  if (res.warnings.length) lines.push("", "■ 注意", ...res.warnings);
+  detail.textContent = lines.join("\n");
+  if (res.errors.length === 0) {
+    banner.className = "";            // 正常時は非表示
+    banner.textContent = "";
+  } else {
+    banner.className = "ng";
+    banner.textContent = `⚠ ${res.errors.length}件の問題があります（タップで表示）`;
+  }
+  if (res.errors.length || res.warnings.length) console.warn(detail.textContent);
+  return res.errors.length === 0;
+}
+function toggleCheckDetail() {
+  const d = document.getElementById("selfcheck-detail");
+  d.style.display = d.style.display === "block" ? "none" : "block";
+}
+
+// ==========================================================
+// ゲーム状態
+// ==========================================================
+let curIdx = 0, score = 0, solved = false, gameDone = false;
+let fillInputs = {};      // "r,i" -> 入力中の文字列
+let activeBlank = null;   // 選択中の "r,i"
+let triData = [];
+
+// ==========================================================
+// 三角形の描画
+// ==========================================================
+function cellSize(rows) {
+  const maxW = Math.min(window.innerWidth - 40, 640);
+  let s = Math.floor(maxW / rows) - 4;
+  return Math.max(18, Math.min(s, 60));
+}
+function fontSize(size, digits) {
+  let f = size * 0.42;
+  if (digits >= 4) f = size * 0.30;
+  else if (digits === 3) f = size * 0.36;
+  return Math.max(9, f) + "px";
+}
+
+function renderTriangle() {
+  const p = PUZZLES[curIdx];
+  const el = document.getElementById("triangle");
+  el.innerHTML = "";
+  triData = buildPascal(p.rows);
+  const size = cellSize(p.rows);
+  const blankSet = new Set(getBlanks(p).map(b => b.r+","+b.i));
+
+  for (let r = 1; r <= p.rows; r++) {
+    const rowEl = document.createElement("div");
+    rowEl.className = "tri-row";
+    for (let i = 0; i < r; i++) {
+      const key = r+","+i;
+      const v = cellValue(triData, r, i);
+      const cell = document.createElement("div");
+      cell.className = "tri-cell";
+      cell.style.width = size + "px";
+      cell.style.height = size + "px";
+      cell.dataset.key = key;
+
+      if (blankSet.has(key)) {
+        cell.classList.add("blank");
+        const inp = fillInputs[key] || "";
+        cell.textContent = inp;
+        cell.style.fontSize = fontSize(size, (inp || "").length || 1);
+        if (activeBlank === key) cell.classList.add("active");
+        cell.onclick = () => selectBlank(key);
+      } else {
+        cell.textContent = v;
+        cell.style.fontSize = fontSize(size, String(v).length);
+      }
+      rowEl.appendChild(cell);
+    }
+    el.appendChild(rowEl);
+  }
+}
+
+// ==========================================================
+// 入力パッド
+// ==========================================================
+function renderPad() {
+  const pad = document.getElementById("pad");
+  pad.innerHTML = "";
+  ["1","2","3","4","5","6","7","8","9","0"].forEach(k => {
+    const b = document.createElement("button");
+    b.className = "pad-key"; b.textContent = k;
+    b.onclick = () => padPress(k);
+    pad.appendChild(b);
+  });
+  const del = document.createElement("button");
+  del.className = "pad-key fn"; del.textContent = "⌫";
+  del.style.gridColumn = "span 2";
+  del.onclick = () => padPress("del");
+  pad.appendChild(del);
+  const clr = document.createElement("button");
+  clr.className = "pad-key fn"; clr.textContent = "クリア";
+  clr.style.gridColumn = "span 3"; clr.style.fontSize = "1rem";
+  clr.onclick = () => padPress("clear");
+  pad.appendChild(clr);
+}
+
+function padPress(k) {
+  if (solved) return;
+  if (!activeBlank) { setMsg("先に黄色のマスをタップしてね"); return; }
+  let cur = fillInputs[activeBlank] || "";
+  if (k === "del") cur = cur.slice(0, -1);
+  else if (k === "clear") cur = "";
+  else if (cur.length < 5) cur += k;
+  fillInputs[activeBlank] = cur;
+  renderTriangle();
+}
+
+function selectBlank(key) {
+  if (solved) return;
+  activeBlank = key;
+  renderTriangle();
+  setMsg("数字パッドかキーボードで数を入れてね");
+}
+// キーボード操作用：未入力の空欄を上から探して選ぶ／次の空欄へ移る
+function blankKeyList() { return getBlanks(PUZZLES[curIdx]).map(b => b.r+","+b.i); }
+function selectFirstEmpty() {
+  const keys = blankKeyList();
+  activeBlank = keys.find(k => !fillInputs[k]) || keys[0] || null;
+  renderTriangle();
+}
+function selectNextBlank() {
+  const keys = blankKeyList(); if (!keys.length) return;
+  const idx = keys.indexOf(activeBlank);
+  activeBlank = keys[(idx + 1) % keys.length];
+  renderTriangle();
+}
+
+// ==========================================================
+// 判定
+// ==========================================================
+function judge() {
+  if (solved) return;
+  const p = PUZZLES[curIdx];
+  const blanks = getBlanks(p);
+  let allRight = true, anyEmpty = false;
+  document.querySelectorAll(".tri-cell.blank").forEach(c => c.classList.remove("wrong","right"));
+  blanks.forEach(b => {
+    const key = b.r+","+b.i;
+    const correct = cellValue(triData, b.r, b.i);
+    const val = parseInt(fillInputs[key], 10);
+    const cell = document.querySelector(`.tri-cell[data-key="${key}"]`);
+    if (isNaN(val)) { anyEmpty = true; allRight = false; return; }
+    if (val === correct) { if (cell) cell.classList.add("right"); }
+    else { if (cell) cell.classList.add("wrong"); allRight = false; }
+  });
+  if (anyEmpty) { setMsg("まだ空いているマスがあるよ"); return; }
+  if (allRight) onSolved();
+  else setMsg("赤いマスをもう一度考えてみよう");
+}
+
+function onSolved() {
+  solved = true;
+  score += PUZZLES[curIdx].difficulty * 10;
+  document.getElementById("score").textContent = score;
+  showFeedback("⭕ せいかい！", "#27ae60");
+  setMsg("三角形が完成したよ！");
+  setTimeout(nextPuzzle, 2000);
+}
+
+function showFeedback(text, color) {
+  const el = document.getElementById("feedback");
+  el.textContent = text; el.style.color = color;
+  el.classList.remove("show"); void el.offsetWidth; el.classList.add("show");
+}
+
+// ==========================================================
+// 画面遷移・ボタン
+// ==========================================================
+function setMsg(t) { document.getElementById("msg-text").textContent = t; }
+
+function loadPuzzle(idx) {
+  if (idx >= PUZZLES.length) { showComplete(); return; }
+  curIdx = idx; solved = false; gameDone = false;
+  fillInputs = {}; activeBlank = null;
+  const p = PUZZLES[idx];
+
+  document.getElementById("level-badge").textContent = `${p.id}  ${"★".repeat(p.difficulty)}`;
+  document.getElementById("puzzle-title").textContent = p.title || "";
+  document.getElementById("progress-fill").style.width = `${(idx/PUZZLES.length)*100}%`;
+  document.getElementById("nav-count").textContent = `${idx+1} / ${PUZZLES.length}`;
+  document.getElementById("prev-btn").disabled = (idx === 0);
+  document.getElementById("next-btn").disabled = (idx >= PUZZLES.length - 1);
+  document.getElementById("rule-display").innerHTML =
+    "黄色のマスに入る数を計算しよう！<br>（すぐ上の左＋右のあたい。両はしは 1）";
+  document.getElementById("pad").style.display = "grid";
+  setMsg("黄色のマスをえらんで、数字パッドかキーボードで入力しよう");
+
+  renderTriangle();
+}
+
+function resetPuzzle() {
+  if (solved) return;
+  loadPuzzle(curIdx);
+}
+
+function showHint() {
+  if (solved) return;
+  setMsg(PUZZLES[curIdx].hint || "よく考えてみよう！");
+}
+
+function showAnswer() {
+  if (solved) return;
+  const p = PUZZLES[curIdx];
+  getBlanks(p).forEach(b => { fillInputs[b.r+","+b.i] = String(cellValue(triData, b.r, b.i)); });
+  renderTriangle();
+  document.querySelectorAll(".tri-cell.blank").forEach(c => c.classList.add("right"));
+  setMsg("これが正解だよ！");
+  solved = true;
+  setTimeout(nextPuzzle, 2200);
+}
+
+function nextPuzzle() {
+  if (curIdx + 1 < PUZZLES.length) loadPuzzle(curIdx + 1);
+  else showComplete();
+}
+
+// 手動ナビ（解いていなくても前後の問題に移動できる）
+function prevPuzzle() { if (curIdx > 0) loadPuzzle(curIdx - 1); }
+function goNext()     { if (curIdx + 1 < PUZZLES.length) loadPuzzle(curIdx + 1); }
+
+function showComplete() {
+  gameDone = true;
+  document.getElementById("puzzle-title").textContent = "🎉 ぜんぶクリア！";
+  document.getElementById("rule-display").innerHTML = `スコア <b>${score}</b> てん！おめでとう！`;
+  document.getElementById("triangle").innerHTML = '<div style="text-align:center;font-size:3rem;padding:30px">🏆</div>';
+  document.getElementById("pad").style.display = "none";
+  document.getElementById("progress-fill").style.width = "100%";
+  document.getElementById("next-btn").disabled = true;
+  setMsg("よくがんばりました！");
+}
+
+// ==========================================================
+// 初期化
+// ==========================================================
+window.addEventListener("resize", () => { if (!gameDone) renderTriangle(); });
+// 物理キーボード入力：数字=入力 / Backspace=1文字消す / Enter・Tab・→・↓=次の空欄へ
+document.addEventListener("keydown", (e) => {
+  if (solved || gameDone) return;
+  if (/^[0-9]$/.test(e.key)) { if (!activeBlank) selectFirstEmpty(); padPress(e.key); e.preventDefault(); }
+  else if (e.key === "Backspace") { if (activeBlank) { padPress("del"); e.preventDefault(); } }
+  else if (e.key === "Enter" || e.key === "Tab" || e.key === "ArrowRight" || e.key === "ArrowDown") { selectNextBlank(); e.preventDefault(); }
+});
+renderSelfCheck();
+renderPad();
+if (PUZZLES.length > 0) loadPuzzle(0);
+else setMsg("パズルデータがありません");
+</script>
+</body>
+</html>
