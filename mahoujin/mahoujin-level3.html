@@ -1,0 +1,815 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>かけ算 魔法陣パズル</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Rounded Mplus 1c', 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    background: linear-gradient(135deg, #6c3483 0%, #e74c3c 100%);
+    min-height: 100vh;
+    color: #333;
+    user-select: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* ヘッダー */
+  #header {
+    width: 100%;
+    padding: 10px 20px;
+    background: rgba(255,255,255,0.92);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+    z-index: 10;
+  }
+  #header h1 {
+    font-size: 1.2rem;
+    color: #6c3483;
+  }
+  #level-badge {
+    background: #e74c3c;
+    color: white;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+  }
+
+  /* メインエリア */
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    gap: 20px;
+    width: 100%;
+    max-width: 600px;
+  }
+
+  /* 問題タイトル */
+  #puzzle-title {
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 12px 24px;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #6c3483;
+  }
+
+  /* ルール表示 */
+  #rule-display {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 8px 16px;
+    text-align: center;
+    font-size: 0.85rem;
+    color: #555;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  }
+  #rule-display .magic-num {
+    font-weight: bold;
+    color: #e74c3c;
+    font-size: 1.1rem;
+  }
+
+  /* 3x3 グリッド */
+  #grid-container {
+    position: relative;
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(3, 90px);
+    grid-template-rows: repeat(3, 90px);
+    gap: 4px;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+  }
+  .cell {
+    width: 90px;
+    height: 90px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .cell.hint {
+    background: linear-gradient(135deg, #dfe6e9, #b2bec3);
+    color: #2c3e50;
+    cursor: default;
+  }
+  .cell.empty {
+    background: linear-gradient(135deg, #ffeaa7, #fdcb6e);
+    border: 3px dashed #f39c12;
+    cursor: pointer;
+  }
+  .cell.empty:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(243,156,18,0.4);
+  }
+  .cell.empty.drag-over {
+    background: linear-gradient(135deg, #55efc4, #00b894);
+    border-color: #00b894;
+    transform: scale(1.08);
+  }
+  .cell.filled {
+    background: linear-gradient(135deg, #e17055, #d63031);
+    color: white;
+    cursor: grab;
+    box-shadow: 0 2px 8px rgba(214,48,49,0.3);
+  }
+  .cell.filled:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(214,48,49,0.5);
+  }
+  .cell.filled:active {
+    cursor: grabbing;
+  }
+  .cell.correct {
+    background: linear-gradient(135deg, #55efc4, #00b894) !important;
+    color: white;
+  }
+
+  /* 積表示 */
+  .sum-label {
+    position: absolute;
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #636e72;
+    background: rgba(255,255,255,0.8);
+    padding: 2px 6px;
+    border-radius: 8px;
+    white-space: nowrap;
+  }
+  .sum-row { right: -50px; }
+  .sum-row.r0 { top: 36px; }
+  .sum-row.r1 { top: 130px; }
+  .sum-row.r2 { top: 224px; }
+  .sum-col { bottom: -30px; }
+  .sum-col.c0 { left: 38px; }
+  .sum-col.c1 { left: 132px; }
+  .sum-col.c2 { left: 226px; }
+  .sum-diag { font-size: 0.65rem; }
+  .sum-diag.d1 { top: -25px; left: 16px; }
+  .sum-diag.d2 { top: -25px; right: 16px; }
+  .sum-label.complete { color: #00b894; font-weight: 900; }
+  .sum-label.over { color: #d63031; }
+
+  /* 数字プール */
+  #number-pool {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    min-height: 70px;
+    max-width: 480px;
+    width: 100%;
+  }
+  .pool-num {
+    min-width: 50px;
+    height: 50px;
+    padding: 0 8px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    font-weight: bold;
+    cursor: grab;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(108,92,231,0.3);
+  }
+  .pool-num:hover {
+    transform: scale(1.1);
+    box-shadow: 0 4px 16px rgba(108,92,231,0.5);
+  }
+  .pool-num:active {
+    cursor: grabbing;
+    transform: scale(0.95);
+  }
+
+  /* スコアパネル */
+  #score-panel {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    background: rgba(255,255,255,0.9);
+    border-radius: 14px;
+    padding: 12px 18px;
+    z-index: 10;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  #score-panel .label { font-size: 0.75rem; color: #888; }
+  #score-panel .value { font-size: 1.5rem; font-weight: bold; color: #6c3483; }
+
+  /* 進捗バー */
+  #progress-bar {
+    width: 100%;
+    max-width: 400px;
+    height: 8px;
+    background: rgba(255,255,255,0.3);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e74c3c, #f39c12);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* 操作ボタン */
+  #controls {
+    display: flex;
+    gap: 10px;
+  }
+  .ctrl-btn {
+    padding: 10px 18px;
+    border: none;
+    border-radius: 12px;
+    background: rgba(255,255,255,0.9);
+    font-size: 0.9rem;
+    cursor: pointer;
+    font-weight: bold;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+  }
+  .ctrl-btn:hover { transform: scale(1.05); background: white; }
+
+  /* フィードバック */
+  #feedback {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    font-weight: bold;
+    z-index: 100;
+    pointer-events: none;
+    opacity: 0;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  #feedback.show {
+    opacity: 1;
+    animation: pop 0.8s ease forwards;
+  }
+
+  /* 操作説明 */
+  #instructions {
+    background: rgba(255,255,255,0.85);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
+    padding: 10px 20px;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    max-width: 400px;
+  }
+  #instructions .msg { font-size: 0.9rem; color: #333; }
+  #instructions .sub { font-size: 0.75rem; color: #888; margin-top: 4px; }
+
+  /* ドラッグ中の要素 */
+  .drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 1000;
+    min-width: 55px;
+    height: 55px;
+    padding: 0 10px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #a29bfe, #6c5ce7);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    font-weight: bold;
+    opacity: 0.9;
+    box-shadow: 0 8px 24px rgba(108,92,231,0.5);
+    transform: translate(-50%, -50%);
+  }
+
+  @keyframes pop {
+    0% { transform: translate(-50%,-50%) scale(0.5); opacity: 0; }
+    40% { transform: translate(-50%,-50%) scale(1.3); opacity: 1; }
+    70% { transform: translate(-50%,-50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-6px); }
+    75% { transform: translateX(6px); }
+  }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <h1>✖️ かけ算 魔法陣パズル</h1>
+  <span id="level-badge">Q1</span>
+</div>
+
+<div id="main">
+  <div id="puzzle-title">はじめてのかけ算魔法陣</div>
+  <div id="rule-display">
+    たて・よこ・ななめ、すべての<b>かけ算</b>の答えを <span class="magic-num" id="target-display">216</span> にしよう！
+  </div>
+  <div id="progress-bar"><div id="progress-fill" style="width:0%"></div></div>
+
+  <div id="grid-container">
+    <div id="grid"></div>
+    <!-- 積ラベル -->
+    <div class="sum-label sum-row r0" id="sum-r0">-</div>
+    <div class="sum-label sum-row r1" id="sum-r1">-</div>
+    <div class="sum-label sum-row r2" id="sum-r2">-</div>
+    <div class="sum-label sum-col c0" id="sum-c0">-</div>
+    <div class="sum-label sum-col c1" id="sum-c1">-</div>
+    <div class="sum-label sum-col c2" id="sum-c2">-</div>
+    <div class="sum-label sum-diag d1" id="sum-d1">＼ -</div>
+    <div class="sum-label sum-diag d2" id="sum-d2">／ -</div>
+  </div>
+
+  <div id="number-pool"></div>
+
+  <div id="controls">
+    <button class="ctrl-btn" onclick="resetPuzzle()">🔄 やりなおし</button>
+    <button class="ctrl-btn" onclick="showHint()">💡 ヒント</button>
+    <button class="ctrl-btn" onclick="showAnswer()">👀 こたえ</button>
+  </div>
+
+  <div id="instructions">
+    <div class="msg" id="msg-text">数字をドラッグしてマスに入れよう！</div>
+    <div class="sub">数字はマスの間でも移動できるよ</div>
+  </div>
+</div>
+
+<div id="score-panel">
+  <div class="label">スコア</div>
+  <div class="value" id="score">0</div>
+</div>
+
+<div id="feedback"></div>
+
+<script>
+// ==========================================
+// パズルデータ
+// ==========================================
+
+const PUZZLES = [
+  // ★ やさしい（ヒント6個、埋める数3個）積=216
+  { id: "Q1", difficulty: 1, title: "はじめてのかけ算魔法陣",
+    magicProduct: 216,
+    answer: [2,9,12, 36,6,1, 3,4,18],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [0,1,3,5,6,8],
+    hint: "のこりは 4, 6, 12 だよ" },
+
+  { id: "Q2", difficulty: 1, title: "ならべてみよう",
+    magicProduct: 216,
+    answer: [3,36,2, 4,6,9, 18,1,12],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [0,2,4,5,6,7],
+    hint: "のこりは 36, 4, 12 だよ" },
+
+  { id: "Q3", difficulty: 1, title: "あとすこし",
+    magicProduct: 216,
+    answer: [18,4,3, 1,6,36, 12,9,2],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [1,2,3,4,7,8],
+    hint: "のこりは 18, 12, 36 だよ" },
+
+  // ★★★ ふつう（ヒント4個、埋める数5個）積=216
+  { id: "Q4", difficulty: 3, title: "かんがえてみよう",
+    magicProduct: 216,
+    answer: [12,1,18, 9,6,4, 2,36,3],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [0,4,6,8],
+    hint: "まんなかは 6。行ごとに掛けて216になるよ" },
+
+  { id: "Q5", difficulty: 3, title: "ななめに注目",
+    magicProduct: 216,
+    answer: [3,4,18, 36,6,1, 2,9,12],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [2,4,5,6],
+    hint: "対角線も216。18×6×?=216" },
+
+  { id: "Q6", difficulty: 3, title: "チェッカー",
+    magicProduct: 216,
+    answer: [12,9,2, 1,6,36, 18,4,3],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [1,3,5,7],
+    hint: "角の数をまず決めよう" },
+
+  { id: "Q7", difficulty: 3, title: "1000にしよう！",
+    magicProduct: 1000,
+    answer: [2,25,20, 100,10,1, 5,4,50],
+    nums: [1,2,4,5,10,20,25,50,100],
+    hints: [0,4,6,8],
+    hint: "まんなかは 10。2×?×?=1000" },
+
+  // ★★★★★ むずかしい（ヒント1-2個）
+  { id: "Q8", difficulty: 5, title: "チャレンジ！",
+    magicProduct: 1000,
+    answer: [5,100,2, 4,10,25, 50,1,20],
+    nums: [1,2,4,5,10,20,25,50,100],
+    hints: [4,7],
+    hint: "10が真ん中。各行を掛けると1000になるよ" },
+
+  { id: "Q9", difficulty: 5, title: "ほぼ白紙！",
+    magicProduct: 216,
+    answer: [2,36,3, 9,6,4, 12,1,18],
+    nums: [1,2,3,4,6,9,12,18,36],
+    hints: [4,8],
+    hint: "6×18=108。もうひとつ掛けて216になる数は？" },
+
+  { id: "Q10", difficulty: 5, title: "かけ算マスター",
+    magicProduct: 1000,
+    answer: [50,4,5, 1,10,100, 20,25,2],
+    nums: [1,2,4,5,10,20,25,50,100],
+    hints: [4],
+    hint: "真ん中は10。角には大きな数と小さな数が交互に入るよ" },
+];
+
+// ==========================================
+// ゲーム状態
+// ==========================================
+let currentPuzzleIdx = 0;
+let score = 0;
+let grid = new Array(9).fill(null);
+let hintCells = new Set();
+let solved = false;
+let dragNum = null;
+let dragSource = null;
+
+function currentProduct() {
+  return PUZZLES[currentPuzzleIdx].magicProduct;
+}
+
+// ==========================================
+// グリッド描画
+// ==========================================
+function renderGrid() {
+  const gridEl = document.getElementById('grid');
+  gridEl.innerHTML = '';
+
+  for (let i = 0; i < 9; i++) {
+    const cell = document.createElement('div');
+    cell.classList.add('cell');
+    cell.dataset.index = i;
+
+    if (hintCells.has(i)) {
+      cell.classList.add('hint');
+      cell.textContent = grid[i];
+    } else if (grid[i] !== null) {
+      cell.classList.add('filled');
+      cell.textContent = grid[i];
+      cell.addEventListener('mousedown', (e) => startDragFromCell(e, i));
+      cell.addEventListener('touchstart', (e) => startDragFromCell(e, i), { passive: false });
+    } else {
+      cell.classList.add('empty');
+    }
+
+    cell.addEventListener('mouseenter', (e) => onDragEnterCell(e, i));
+    cell.addEventListener('mouseleave', (e) => onDragLeaveCell(e, i));
+    gridEl.appendChild(cell);
+  }
+
+  updateProducts();
+}
+
+// ==========================================
+// 数字プール描画
+// ==========================================
+function renderPool() {
+  const poolEl = document.getElementById('number-pool');
+  poolEl.innerHTML = '';
+
+  const p = PUZZLES[currentPuzzleIdx];
+  const usedNums = grid.filter(v => v !== null);
+  // 使用済みカウント
+  const usedCount = {};
+  usedNums.forEach(n => { usedCount[n] = (usedCount[n] || 0) + 1; });
+  const allCount = {};
+  p.nums.forEach(n => { allCount[n] = (allCount[n] || 0) + 1; });
+
+  p.nums.forEach(n => {
+    const used = usedCount[n] || 0;
+    const total = allCount[n] || 0;
+    if (used >= total) return;
+    const numEl = document.createElement('div');
+    numEl.classList.add('pool-num');
+    numEl.textContent = n;
+    numEl.addEventListener('mousedown', (e) => startDragFromPool(e, n));
+    numEl.addEventListener('touchstart', (e) => startDragFromPool(e, n), { passive: false });
+    poolEl.appendChild(numEl);
+  });
+}
+
+// ==========================================
+// ドラッグ＆ドロップ
+// ==========================================
+let ghostEl = null;
+
+function startDragFromPool(e, num) {
+  if (solved) return;
+  e.preventDefault();
+  dragNum = num;
+  dragSource = 'pool';
+  createGhost(num, e);
+}
+
+function startDragFromCell(e, idx) {
+  if (solved) return;
+  if (hintCells.has(idx)) return;
+  e.preventDefault();
+  dragNum = grid[idx];
+  dragSource = idx;
+  grid[idx] = null;
+  renderGrid();
+  renderPool();
+  createGhost(dragNum, e);
+}
+
+function createGhost(num, e) {
+  ghostEl = document.createElement('div');
+  ghostEl.classList.add('drag-ghost');
+  ghostEl.textContent = num;
+  document.body.appendChild(ghostEl);
+  moveGhost(e);
+  document.addEventListener('mousemove', moveGhost);
+  document.addEventListener('mouseup', endDrag);
+  document.addEventListener('touchmove', moveGhost, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
+function moveGhost(e) {
+  if (!ghostEl) return;
+  let x, y;
+  if (e.touches) {
+    e.preventDefault();
+    x = e.touches[0].clientX;
+    y = e.touches[0].clientY;
+  } else {
+    x = e.clientX;
+    y = e.clientY;
+  }
+  ghostEl.style.left = x + 'px';
+  ghostEl.style.top = y + 'px';
+
+  const cells = document.querySelectorAll('.cell');
+  cells.forEach(c => c.classList.remove('drag-over'));
+  const el = document.elementFromPoint(x, y);
+  if (el && el.classList.contains('cell')) {
+    const idx = parseInt(el.dataset.index);
+    if (!hintCells.has(idx) && grid[idx] === null) {
+      el.classList.add('drag-over');
+    }
+  }
+}
+
+function endDrag(e) {
+  if (!ghostEl) return;
+  document.removeEventListener('mousemove', moveGhost);
+  document.removeEventListener('mouseup', endDrag);
+  document.removeEventListener('touchmove', moveGhost);
+  document.removeEventListener('touchend', endDrag);
+
+  let x, y;
+  if (e.changedTouches) {
+    x = e.changedTouches[0].clientX;
+    y = e.changedTouches[0].clientY;
+  } else {
+    x = e.clientX;
+    y = e.clientY;
+  }
+
+  ghostEl.remove();
+  ghostEl = null;
+
+  const el = document.elementFromPoint(x, y);
+  let dropped = false;
+  if (el && el.classList.contains('cell')) {
+    const idx = parseInt(el.dataset.index);
+    if (!hintCells.has(idx) && grid[idx] === null) {
+      grid[idx] = dragNum;
+      dropped = true;
+    }
+  }
+
+  if (!dropped && typeof dragSource === 'number') {
+    grid[dragSource] = dragNum;
+  }
+
+  dragNum = null;
+  dragSource = null;
+  renderGrid();
+  renderPool();
+
+  if (dropped) checkSolved();
+}
+
+function onDragEnterCell(e, idx) {
+  if (dragNum === null) return;
+  if (!hintCells.has(idx) && grid[idx] === null) {
+    e.target.classList.add('drag-over');
+  }
+}
+
+function onDragLeaveCell(e, idx) {
+  e.target.classList.remove('drag-over');
+}
+
+// ==========================================
+// 積表示の更新
+// ==========================================
+function updateProducts() {
+  const mp = currentProduct();
+  for (let r = 0; r < 3; r++) {
+    const vals = [grid[r*3], grid[r*3+1], grid[r*3+2]];
+    updateProductLabel(`sum-r${r}`, vals, '', mp);
+  }
+  for (let c = 0; c < 3; c++) {
+    const vals = [grid[c], grid[c+3], grid[c+6]];
+    updateProductLabel(`sum-c${c}`, vals, '', mp);
+  }
+  updateProductLabel('sum-d1', [grid[0], grid[4], grid[8]], '＼ ', mp);
+  updateProductLabel('sum-d2', [grid[2], grid[4], grid[6]], '／ ', mp);
+}
+
+function updateProductLabel(id, vals, prefix, mp) {
+  const el = document.getElementById(id);
+  const filled = vals.filter(v => v !== null);
+  if (filled.length === 0) {
+    el.textContent = prefix + '-';
+    el.classList.remove('complete', 'over');
+    return;
+  }
+  const product = filled.reduce((a, b) => a * b, 1);
+  el.textContent = prefix + product;
+
+  el.classList.remove('complete', 'over');
+  if (filled.length === 3) {
+    if (product === mp) {
+      el.classList.add('complete');
+    } else {
+      el.classList.add('over');
+    }
+  } else if (product > mp) {
+    el.classList.add('over');
+  }
+}
+
+// ==========================================
+// 判定
+// ==========================================
+function checkSolved() {
+  if (grid.includes(null)) return;
+  const mp = currentProduct();
+
+  for (let r = 0; r < 3; r++) {
+    if (grid[r*3] * grid[r*3+1] * grid[r*3+2] !== mp) return;
+  }
+  for (let c = 0; c < 3; c++) {
+    if (grid[c] * grid[c+3] * grid[c+6] !== mp) return;
+  }
+  if (grid[0] * grid[4] * grid[8] !== mp) return;
+  if (grid[2] * grid[4] * grid[6] !== mp) return;
+
+  onSolved();
+}
+
+function onSolved() {
+  solved = true;
+  score += PUZZLES[currentPuzzleIdx].difficulty * 10;
+  document.getElementById('score').textContent = score;
+  showFeedback('⭕ すごい！', '#27ae60');
+  document.getElementById('msg-text').textContent = 'クリア！';
+
+  document.querySelectorAll('.cell').forEach(c => c.classList.add('correct'));
+
+  setTimeout(() => {
+    currentPuzzleIdx++;
+    if (currentPuzzleIdx < PUZZLES.length) {
+      loadPuzzle(currentPuzzleIdx);
+    } else {
+      showComplete();
+    }
+  }, 2500);
+}
+
+function showFeedback(text, color) {
+  const el = document.getElementById('feedback');
+  el.textContent = text;
+  el.style.color = color;
+  el.classList.remove('show');
+  void el.offsetWidth;
+  el.classList.add('show');
+}
+
+function showComplete() {
+  document.getElementById('puzzle-title').textContent = '🎉 ぜんぶクリア！';
+  document.getElementById('msg-text').textContent = `スコア: ${score}てん おめでとう！`;
+  document.getElementById('grid').innerHTML = '<div style="grid-column:1/-1;text-align:center;font-size:3rem;padding:40px">🏆</div>';
+  document.getElementById('number-pool').innerHTML = '';
+}
+
+// ==========================================
+// パズル読み込み
+// ==========================================
+function loadPuzzle(idx) {
+  if (idx >= PUZZLES.length) { showComplete(); return; }
+  const p = PUZZLES[idx];
+  solved = false;
+
+  grid = new Array(9).fill(null);
+  hintCells = new Set(p.hints);
+  p.hints.forEach(i => { grid[i] = p.answer[i]; });
+
+  document.getElementById('level-badge').textContent =
+    `${p.id}  ${'★'.repeat(p.difficulty)}`;
+  document.getElementById('puzzle-title').textContent = p.title;
+  document.getElementById('target-display').textContent = p.magicProduct;
+  document.getElementById('progress-fill').style.width =
+    `${(idx / PUZZLES.length) * 100}%`;
+
+  renderGrid();
+  renderPool();
+  document.getElementById('msg-text').textContent = '数字をドラッグしてマスに入れよう！';
+}
+
+// ==========================================
+// ボタン操作
+// ==========================================
+function resetPuzzle() {
+  if (solved) return;
+  loadPuzzle(currentPuzzleIdx);
+}
+
+function showHint() {
+  if (solved || currentPuzzleIdx >= PUZZLES.length) return;
+  const p = PUZZLES[currentPuzzleIdx];
+  document.getElementById('msg-text').textContent = p.hint || 'よく考えてみよう！';
+  setTimeout(() => {
+    if (!solved) {
+      document.getElementById('msg-text').textContent = '数字をドラッグしてマスに入れよう！';
+    }
+  }, 3000);
+}
+
+function showAnswer() {
+  if (solved || currentPuzzleIdx >= PUZZLES.length) return;
+  const p = PUZZLES[currentPuzzleIdx];
+  grid = [...p.answer];
+  renderGrid();
+  renderPool();
+  document.getElementById('msg-text').textContent = 'これが正解だよ！';
+
+  document.querySelectorAll('.cell').forEach(c => c.classList.add('correct'));
+
+  solved = true;
+  setTimeout(() => {
+    currentPuzzleIdx++;
+    if (currentPuzzleIdx < PUZZLES.length) {
+      loadPuzzle(currentPuzzleIdx);
+    } else {
+      showComplete();
+    }
+  }, 2500);
+}
+
+// ==========================================
+// 初期化
+// ==========================================
+if (PUZZLES.length > 0) {
+  loadPuzzle(0);
+} else {
+  document.getElementById('msg-text').textContent = 'パズルデータがありません';
+}
+</script>
+</body>
+</html>
