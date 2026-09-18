@@ -3,3 +3,8 @@
 
 # Claude Code のローカル設定
 .claude/
+
+# ローカル参照用にクローンした外部リポジトリ（Git管理外）
+# .gitmodules 無しのgitlinkはGitHub Pagesのビルドを失敗させるため除外
+tangram/TangramGenerator/
+tangram/kilogram/
