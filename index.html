@@ -39,27 +39,6 @@
   header .logo .mark { display: inline-block; margin-right: 8px; }
   header .tagline { margin-top: 8px; font-size: 0.95rem; opacity: 0.9; }
 
-  /* ---------- system banner ---------- */
-  .system {
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
-    padding: 18px 22px; margin-bottom: 30px;
-  }
-  .system .icon { font-size: 2rem; line-height: 1; }
-  .system .body { flex: 1 1 260px; min-width: 0; }
-  .system .body h2 { font-size: 1.1rem; font-weight: 900; }
-  .system .body p { font-size: 0.86rem; color: var(--ink-sub); margin-top: 2px; }
-  .system .action {
-    display: inline-block; padding: 11px 22px; border-radius: 999px; text-decoration: none;
-    background: linear-gradient(135deg, #0984e3, #6c5ce7); color: #fff; font-weight: 700; font-size: 0.92rem;
-    box-shadow: 0 4px 14px rgba(9, 132, 227, 0.4); transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap;
-  }
-  .system .action:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(9, 132, 227, 0.5); }
-  .system .action:active { transform: scale(0.97); }
-  .system .action.disabled {
-    background: #dfe6e9; color: #8a97a0; box-shadow: none; cursor: default; pointer-events: none;
-  }
-
   /* ---------- search ---------- */
   .search { position: relative; margin-bottom: 26px; }
   .search input {
@@ -115,8 +94,6 @@
     header { padding: 28px 0 20px; }
     header .logo { font-size: 1.6rem; }
     .grid { grid-template-columns: 1fr; }
-    .system { padding: 16px; }
-    .system .action { width: 100%; text-align: center; }
   }
 </style>
 </head>
@@ -130,16 +107,6 @@
 </header>
 
 <main class="wrap">
-
-  <section class="system">
-    <div class="icon">🗂️</div>
-    <div class="body">
-      <h2>算数ブロックパズル管理システム</h2>
-      <p>問題の投稿・管理・閲覧を行う Web アプリ（ログインが必要です）</p>
-    </div>
-    <!-- 管理システムのURLは下部の SYSTEM_URL で設定してください -->
-    <a class="action" id="system-link" href="#">システムを開く</a>
-  </section>
 
   <div class="search">
     <span class="glass">🔍</span>
@@ -317,27 +284,6 @@
 </footer>
 
 <script>
-  /* ============================================================
-     管理システム（算数ブロックパズル管理システム）のURL。
-     AWS Amplify Hosting のURLに書き換えてください。
-     例: "https://main.d1234abcd.amplifyapp.com"
-     空文字のままなら「準備中」表示になります。
-     ============================================================ */
-  const SYSTEM_URL = "";
-
-  (function setupSystemLink() {
-    const link = document.getElementById("system-link");
-    if (SYSTEM_URL) {
-      link.href = SYSTEM_URL;
-      link.target = "_blank";
-      link.rel = "noopener";
-    } else {
-      link.classList.add("disabled");
-      link.removeAttribute("href");
-      link.textContent = "準備中";
-    }
-  })();
-
   (function setupSearch() {
     const input = document.getElementById("search");
     const cats = Array.from(document.querySelectorAll(".cat"));

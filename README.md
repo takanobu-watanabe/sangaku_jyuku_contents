@@ -12,19 +12,6 @@
 `index.html` がトップページ（教材ポータル）になります。
 `.nojekyll` は Jekyll による変換を無効化し、ファイルをそのまま配信するためのものです。
 
-## 管理システムへのリンク
-
-`index.html` 末尾の `SYSTEM_URL` に、算数ブロックパズル管理システム
-（AWS Amplify Hosting）の URL を設定してください。
-
-```js
-const SYSTEM_URL = "https://main.xxxxxxxx.amplifyapp.com";
-```
-
-空のままだとポータル上のボタンは「準備中」表示になります。
-管理システムは Next.js + Cognito 認証のため GitHub Pages 上では動作せず、
-Amplify Hosting 側へのリンクとして扱います。
-
 ## 教材一覧
 
 | フォルダ | 教材 | 対象 |
