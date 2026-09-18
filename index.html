@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>算楽塾 教材ポータル</title>
+<meta name="description" content="算楽塾のインタラクティブ算数教材ポータル。タングラム・ニキーチンの積み木・魔法陣・パスカルの三角形・公倍数つなぎ・たてよこ算をブラウザでそのまま学習できます。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rounded+Mplus+1c:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-top: #2c3e50;
+    --bg-bottom: #3498db;
+    --card: rgba(255, 255, 255, 0.96);
+    --ink: #2c3e50;
+    --ink-sub: #5b6b7a;
+    --shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+    --radius: 18px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { scroll-behavior: smooth; }
+  html { min-height: 100%; background: var(--bg-bottom); }
+  body {
+    font-family: 'Rounded Mplus 1c', 'Hiragino Maru Gothic Pro', 'Yu Gothic', sans-serif;
+    /* iOS Safari では background-attachment: fixed が効かないため、
+       文書全体の高さに引き伸ばすグラデーションを使う */
+    background: linear-gradient(160deg, var(--bg-top) 0%, var(--bg-bottom) 100%) no-repeat;
+    min-height: 100vh;
+    color: var(--ink);
+    line-height: 1.6;
+  }
+
+  .wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 16px; }
+
+  /* ---------- header ---------- */
+  header { padding: 40px 0 26px; text-align: center; color: #fff; }
+  header .logo { font-size: 2.1rem; font-weight: 900; letter-spacing: 0.04em; text-shadow: 0 2px 12px rgba(0,0,0,0.25); }
+  header .logo .mark { display: inline-block; margin-right: 8px; }
+  header .tagline { margin-top: 8px; font-size: 0.95rem; opacity: 0.9; }
+
+  /* ---------- system banner ---------- */
+  .system {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px 22px; margin-bottom: 30px;
+  }
+  .system .icon { font-size: 2rem; line-height: 1; }
+  .system .body { flex: 1 1 260px; min-width: 0; }
+  .system .body h2 { font-size: 1.1rem; font-weight: 900; }
+  .system .body p { font-size: 0.86rem; color: var(--ink-sub); margin-top: 2px; }
+  .system .action {
+    display: inline-block; padding: 11px 22px; border-radius: 999px; text-decoration: none;
+    background: linear-gradient(135deg, #0984e3, #6c5ce7); color: #fff; font-weight: 700; font-size: 0.92rem;
+    box-shadow: 0 4px 14px rgba(9, 132, 227, 0.4); transition: transform 0.15s, box-shadow 0.15s; white-space: nowrap;
+  }
+  .system .action:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(9, 132, 227, 0.5); }
+  .system .action:active { transform: scale(0.97); }
+  .system .action.disabled {
+    background: #dfe6e9; color: #8a97a0; box-shadow: none; cursor: default; pointer-events: none;
+  }
+
+  /* ---------- search ---------- */
+  .search { position: relative; margin-bottom: 26px; }
+  .search input {
+    width: 100%; padding: 14px 18px 14px 46px; border: none; border-radius: 999px;
+    font-family: inherit; font-size: 1rem; color: var(--ink);
+    background: var(--card); box-shadow: var(--shadow);
+  }
+  .search input:focus { outline: 3px solid rgba(255,255,255,0.55); outline-offset: 2px; }
+  .search .glass { position: absolute; left: 18px; top: 50%; transform: translateY(-50%); font-size: 1.05rem; opacity: 0.55; pointer-events: none; }
+
+  /* ---------- category ---------- */
+  .cat { margin-bottom: 34px; }
+  .cat-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; color: #fff; }
+  .cat-head h2 { font-size: 1.3rem; font-weight: 900; text-shadow: 0 2px 10px rgba(0,0,0,0.22); }
+  .cat-head .grade {
+    font-size: 0.75rem; font-weight: 700; padding: 3px 12px; border-radius: 999px;
+    background: rgba(255,255,255,0.22); border: 1px solid rgba(255,255,255,0.35);
+  }
+  .cat-head .desc { flex: 1 1 100%; font-size: 0.86rem; opacity: 0.88; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+
+  .card {
+    display: flex; flex-direction: column; gap: 8px;
+    background: var(--card); border-radius: var(--radius); box-shadow: var(--shadow);
+    padding: 18px; text-decoration: none; color: inherit;
+    border-top: 5px solid var(--accent, #0984e3);
+    transition: transform 0.16s ease, box-shadow 0.16s ease;
+  }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 14px 34px rgba(0,0,0,0.26); }
+  .card:active { transform: scale(0.985); }
+  /* 1行目: アイコン + バッジ、2行目: タイトル（全幅）。
+     タイトルが途中で折り返して読みにくくなるのを防ぐ */
+  .card .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; row-gap: 6px; }
+  .card .emoji { order: 1; font-size: 1.5rem; line-height: 1; }
+  .card .badge {
+    order: 2; margin-left: auto;
+    font-size: 0.72rem; font-weight: 700; color: #fff; padding: 3px 11px; border-radius: 999px;
+    background: var(--accent, #0984e3); white-space: nowrap;
+  }
+  .card .title { order: 3; flex: 1 1 100%; font-size: 1.02rem; font-weight: 900; }
+  .card .note { font-size: 0.84rem; color: var(--ink-sub); }
+  .card .go { margin-top: auto; font-size: 0.8rem; font-weight: 700; color: var(--accent, #0984e3); }
+
+  .empty { display: none; text-align: center; color: #fff; opacity: 0.9; padding: 26px 0; font-weight: 700; }
+  body.filtering .cat-head .desc { display: none; }
+
+  /* ---------- footer ---------- */
+  footer { padding: 26px 0 44px; text-align: center; color: rgba(255,255,255,0.8); font-size: 0.8rem; }
+  footer a { color: #fff; }
+
+  @media (max-width: 600px) {
+    header { padding: 28px 0 20px; }
+    header .logo { font-size: 1.6rem; }
+    .grid { grid-template-columns: 1fr; }
+    .system { padding: 16px; }
+    .system .action { width: 100%; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="logo"><span class="mark">🧮</span>算楽塾 教材ポータル</div>
+    <p class="tagline">ブラウザだけで遊べる算数パズル教材。タップ・ドラッグでそのまま学習できます。</p>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <section class="system">
+    <div class="icon">🗂️</div>
+    <div class="body">
+      <h2>算数ブロックパズル管理システム</h2>
+      <p>問題の投稿・管理・閲覧を行う Web アプリ（ログインが必要です）</p>
+    </div>
+    <!-- 管理システムのURLは下部の SYSTEM_URL で設定してください -->
+    <a class="action" id="system-link" href="#">システムを開く</a>
+  </section>
+
+  <div class="search">
+    <span class="glass">🔍</span>
+    <input type="search" id="search" placeholder="教材をさがす（例: タングラム、魔法陣、3D）" aria-label="教材を検索">
+  </div>
+
+  <!-- ===== タングラム ===== -->
+  <section class="cat" data-keywords="タングラム tangram シルエット 図形 合同 回転 反転 平面図形">
+    <div class="cat-head">
+      <h2>🔺 タングラム</h2>
+      <span class="grade">小3〜6</span>
+      <p class="desc">7つのピースをドラッグ・回転・反転させてシルエットを完成させる平面図形パズル。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#e17055" href="tangram/tangram-puzzle1.html">
+        <div class="top"><span class="emoji">🔺</span><span class="title">タングラム</span><span class="badge">Level 1</span></div>
+        <p class="note">基本の形から。ピースの向きをそろえる練習。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#e17055" href="tangram/tangram-puzzle2.html">
+        <div class="top"><span class="emoji">🔺</span><span class="title">タングラム</span><span class="badge">Level 2</span></div>
+        <p class="note">回転・反転を使わないと解けない形に挑戦。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#e17055" href="tangram/tangram-puzzle3.html">
+        <div class="top"><span class="emoji">🔺</span><span class="title">タングラム</span><span class="badge">Level 3</span></div>
+        <p class="note">複雑なシルエット。試行錯誤で組み合わせを見つける。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== ニキーチンの積み木 ===== -->
+  <section class="cat" data-keywords="ニキーチン 積み木 3D 立体 ブロック ソーマキューブ 空間認識 キューブ">
+    <div class="cat-head">
+      <h2>🧱 ニキーチンの積み木</h2>
+      <span class="grade">小1〜6</span>
+      <p class="desc">3Dブロックピースを回転・配置して立体を組み上げる空間認識パズル（Three.js 使用）。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#00b894" href="nikichin/nikitin-3d-build-20260314.html">
+        <div class="top"><span class="emoji">🧊</span><span class="title">3Dキューブパズル</span><span class="badge">入門</span></div>
+        <p class="note">ブロックを積んでお手本の立体を再現する。まずはここから。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#00b894" href="nikichin/nikitin-5pieces-20260314.html">
+        <div class="top"><span class="emoji">🧱</span><span class="title">5ピースチャレンジ</span><span class="badge">中級</span></div>
+        <p class="note">5個のピース（19ブロック）で指定の形を作る。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#00b894" href="nikichin/nikitin-7pieces-20260314.html">
+        <div class="top"><span class="emoji">🎲</span><span class="title">7ピースチャレンジ</span><span class="badge">上級</span></div>
+        <p class="note">ソーマキューブ。7ピース（27ブロック）で立方体を完成させる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== 魔法陣 ===== -->
+  <section class="cat" data-keywords="魔法陣 まほうじん magic square たし算 かけ算 3x3 4x4 計算">
+    <div class="cat-head">
+      <h2>🔢 魔法陣パズル</h2>
+      <span class="grade">小2〜5</span>
+      <p class="desc">たて・よこ・ななめの和（積）がすべて同じになるように数を埋める計算パズル。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#0984e3" href="mahoujin/mahoujin-level1.html">
+        <div class="top"><span class="emoji">🔢</span><span class="title">魔法陣 3×3</span><span class="badge">Level 1</span></div>
+        <p class="note">3×3のたし算魔法陣。たし算とひき算で空欄をうめる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#0984e3" href="mahoujin/mahoujin-level2.html">
+        <div class="top"><span class="emoji">🔠</span><span class="title">魔法陣 4×4</span><span class="badge">Level 2</span></div>
+        <p class="note">4×4に拡大。手がかりを組み合わせて推理する。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#0984e3" href="mahoujin/mahoujin-level3.html">
+        <div class="top"><span class="emoji">✖️</span><span class="title">かけ算 魔法陣</span><span class="badge">Level 3</span></div>
+        <p class="note">和ではなく積をそろえる。約数・倍数の感覚が身につく。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== パスカルの三角形 ===== -->
+  <section class="cat" data-keywords="パスカルの三角形 pascal 二項係数 組み合わせ 場合の数 シェルピンスキー 道のり 規則">
+    <div class="cat-head">
+      <h2>📐 パスカルの三角形</h2>
+      <span class="grade">小4〜6</span>
+      <p class="desc">虫食いをたし算でうめる・倍数のマスを塗って模様を作る・道のりの数を数える3タイプ。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#d63031" href="pascal_sankaku/pascal-sankaku-level1.html">
+        <div class="top"><span class="emoji">📐</span><span class="title">虫食いうめ</span><span class="badge">Level 1</span></div>
+        <p class="note">上の2つの数の和になる規則を見つけて空欄をうめる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#d63031" href="pascal_sankaku/pascal-sankaku-level2.html">
+        <div class="top"><span class="emoji">🎨</span><span class="title">色ぬり・虫食い</span><span class="badge">Level 2</span></div>
+        <p class="note">10〜16段まで拡大。奇数・偶数・3の倍数を塗ると模様が現れる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#d63031" href="pascal_sankaku/pascal-sankaku-level3.html">
+        <div class="top"><span class="emoji">🗺️</span><span class="title">道のり問題</span><span class="badge">Level 3</span></div>
+        <p class="note">最短経路の数え上げ。組み合わせの考え方につながる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#d63031" href="pascal_sankaku/%E3%83%91%E3%82%B9%E3%82%AB%E3%83%AB%E3%81%AE%E4%B8%89%E8%A7%92%E5%BD%A2.pdf">
+        <div class="top"><span class="emoji">📄</span><span class="title">解説プリント</span><span class="badge">PDF</span></div>
+        <p class="note">印刷して使える補助教材。</p>
+        <span class="go">ひらく →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== 公倍数つなぎ ===== -->
+  <section class="cat" data-keywords="公倍数 つなぎ 最小公倍数 倍数 約数 迷路 線つなぎ">
+    <div class="cat-head">
+      <h2>🔗 公倍数つなぎ</h2>
+      <span class="grade">小5〜6</span>
+      <p class="desc">倍数になっている数をたどって線でつなぐパズル。公倍数・最小公倍数の理解に。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#6c5ce7" href="koubaisu/koubaisu-tsunagi-level1.html">
+        <div class="top"><span class="emoji">🔗</span><span class="title">公倍数つなぎ</span><span class="badge">Level 1</span></div>
+        <p class="note">小さい数の倍数から。ルールに慣れる。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#6c5ce7" href="koubaisu/koubaisu-tsunagi-level2.html">
+        <div class="top"><span class="emoji">🔗</span><span class="title">公倍数つなぎ</span><span class="badge">Level 2</span></div>
+        <p class="note">盤面が広がり、経路の選び方が増える。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#6c5ce7" href="koubaisu/koubaisu-tsunagi-level3.html">
+        <div class="top"><span class="emoji">🔗</span><span class="title">公倍数つなぎ</span><span class="badge">Level 3</span></div>
+        <p class="note">複数の条件を同時に満たす経路を探す。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ===== たてよこ算 ===== -->
+  <section class="cat" data-keywords="たてよこ算 タテヨコ算 覆面算 たし算 かけ算 計算 逆算">
+    <div class="cat-head">
+      <h2>➕ たてよこ算</h2>
+      <span class="grade">小1〜4</span>
+      <p class="desc">たて・よこの計算結果が合うように数を入れる。四則計算の反復と逆算の練習。</p>
+    </div>
+    <div class="grid">
+      <a class="card" style="--accent:#e84393" href="tateyoko/tateyoko_2x2.html">
+        <div class="top"><span class="emoji">➕</span><span class="title">たてよこ算 2×2</span><span class="badge">たし算</span></div>
+        <p class="note">2×2のマス。たし算の基本パターン。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#e84393" href="tateyoko/tateyoko_2x2_mul.html">
+        <div class="top"><span class="emoji">✖️</span><span class="title">たてよこ算 2×2</span><span class="badge">かけ算</span></div>
+        <p class="note">2×2のマスをかけ算で。九九の定着に。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+      <a class="card" style="--accent:#e84393" href="tateyoko/tateyoko_3x3.html">
+        <div class="top"><span class="emoji">🔢</span><span class="title">たてよこ算 3×3</span><span class="badge">発展</span></div>
+        <p class="note">3×3に拡大。組み合わせを考えながら埋める。</p>
+        <span class="go">あそぶ →</span>
+      </a>
+    </div>
+  </section>
+
+  <p class="empty" id="empty">該当する教材が見つかりませんでした。</p>
+
+</main>
+
+<footer class="wrap">
+  <p>算楽塾 — 小学生向けインタラクティブ算数教材</p>
+  <p>教材は各ページ単体で動作します。タブレット（iPad）でのタッチ操作に対応しています。</p>
+</footer>
+
+<script>
+  /* ============================================================
+     管理システム（算数ブロックパズル管理システム）のURL。
+     AWS Amplify Hosting のURLに書き換えてください。
+     例: "https://main.d1234abcd.amplifyapp.com"
+     空文字のままなら「準備中」表示になります。
+     ============================================================ */
+  const SYSTEM_URL = "";
+
+  (function setupSystemLink() {
+    const link = document.getElementById("system-link");
+    if (SYSTEM_URL) {
+      link.href = SYSTEM_URL;
+      link.target = "_blank";
+      link.rel = "noopener";
+    } else {
+      link.classList.add("disabled");
+      link.removeAttribute("href");
+      link.textContent = "準備中";
+    }
+  })();
+
+  (function setupSearch() {
+    const input = document.getElementById("search");
+    const cats = Array.from(document.querySelectorAll(".cat"));
+    const empty = document.getElementById("empty");
+
+    function normalize(text) {
+      return text.toLowerCase().replace(/\s+/g, "");
+    }
+
+    function apply() {
+      const query = normalize(input.value);
+      document.body.classList.toggle("filtering", query !== "");
+      let hits = 0;
+
+      cats.forEach((cat) => {
+        const haystack = normalize(cat.dataset.keywords + " " + cat.textContent);
+        const catMatched = query === "" || haystack.includes(query);
+        let visibleCards = 0;
+
+        cat.querySelectorAll(".card").forEach((card) => {
+          const cardMatched =
+            catMatched || normalize(card.textContent).includes(query);
+          card.style.display = cardMatched ? "" : "none";
+          if (cardMatched) visibleCards++;
+        });
+
+        cat.style.display = visibleCards > 0 ? "" : "none";
+        hits += visibleCards;
+      });
+
+      empty.style.display = hits === 0 ? "block" : "none";
+    }
+
+    input.addEventListener("input", apply);
+    apply();
+  })();
+</script>
+
+</body>
+</html>
